@@ -60,6 +60,9 @@ metadata_empty_renaming_target =
 metadata_extern_location_not_exist =
     extern location for {$crate_name} does not exist: {$location}
 
+metadata_extern_location_wasm_artifact =
+    extern location for {$crate_name} is wasm artifact: {$location}
+
 metadata_extern_location_not_file =
     extern location for {$crate_name} is not a file: {$location}
 

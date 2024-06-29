@@ -487,6 +487,15 @@ pub struct ExternLocationNotExist<'a> {
 }
 
 #[derive(Diagnostic)]
+#[diag(metadata_extern_location_wasm_artifact)]
+pub struct ExternLocationWasmArtifact<'a> {
+    #[primary_span]
+    pub span: Span,
+    pub crate_name: Symbol,
+    pub location: &'a Path,
+}
+
+#[derive(Diagnostic)]
 #[diag(metadata_extern_location_not_file)]
 pub struct ExternLocationNotFile<'a> {
     #[primary_span]
