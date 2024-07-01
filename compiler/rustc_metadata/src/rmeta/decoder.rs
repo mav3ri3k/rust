@@ -57,7 +57,11 @@ impl std::ops::Deref for MetadataBlob {
 impl MetadataBlob {
     /// Runs the [`MemDecoder`] validation and if it passes, constructs a new [`MetadataBlob`].
     pub fn new(slice: OwnedSlice) -> Result<Self, ()> {
-        if MemDecoder::new(&slice, 0).is_ok() { Ok(Self(slice)) } else { Err(()) }
+        if MemDecoder::new(&slice, 0).is_ok() {
+            Ok(Self(slice))
+        } else {
+            Err(())
+        }
     }
 
     /// Since this has passed the validation of [`MetadataBlob::new`], this returns bytes which are
@@ -315,7 +319,11 @@ impl<T: ParameterizedOverTcx> LazyArray<T> {
     {
         let mut dcx = metadata.decoder(self.position.get());
         dcx.lazy_state = LazyState::NodeStart(self.position);
-        DecodeIterator { elem_counter: (0..self.num_elems), dcx, _phantom: PhantomData }
+        DecodeIterator {
+            elem_counter: (0..self.num_elems),
+            dcx,
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -338,7 +346,10 @@ impl<'a, 'tcx> DecodeContext<'a, 'tcx> {
 
     #[inline]
     pub fn cdata(&self) -> CrateMetadataRef<'a> {
-        debug_assert!(self.cdata.is_some(), "missing CrateMetadata in DecodeContext");
+        debug_assert!(
+            self.cdata.is_some(),
+            "missing CrateMetadata in DecodeContext"
+        );
         self.cdata.unwrap()
     }
 
@@ -398,7 +409,10 @@ impl<'a, 'tcx> TyDecoder for DecodeContext<'a, 'tcx> {
     {
         let tcx = self.tcx();
 
-        let key = ty::CReaderCacheKey { cnum: Some(self.cdata().cnum), pos: shorthand };
+        let key = ty::CReaderCacheKey {
+            cnum: Some(self.cdata().cnum),
+            pos: shorthand,
+        };
 
         if let Some(&ty) = tcx.ty_rcache.borrow().get(&key) {
             return ty;
@@ -454,7 +468,10 @@ impl<'a, 'tcx> SpanDecoder for DecodeContext<'a, 'tcx> {
     }
 
     fn decode_def_id(&mut self) -> DefId {
-        DefId { krate: Decodable::decode(self), index: Decodable::decode(self) }
+        DefId {
+            krate: Decodable::decode(self),
+            index: Decodable::decode(self),
+        }
     }
 
     fn decode_syntax_context(&mut self) -> SyntaxContext {
@@ -493,7 +510,10 @@ impl<'a, 'tcx> SpanDecoder for DecodeContext<'a, 'tcx> {
         let index = u32::decode(self);
 
         let expn_id = rustc_span::hygiene::decode_expn_id(cnum, index, |expn_id| {
-            let ExpnId { krate: cnum, local_id: index } = expn_id;
+            let ExpnId {
+                krate: cnum,
+                local_id: index,
+            } = expn_id;
             // Lookup local `ExpnData`s in our own crate data. Foreign `ExpnData`s
             // are stored in the owning crate, to avoid duplication.
             debug_assert_ne!(cnum, LOCAL_CRATE);
@@ -572,7 +592,9 @@ impl<'a, 'tcx> SpanDecoder for DecodeContext<'a, 'tcx> {
 impl<'a, 'tcx> Decodable<DecodeContext<'a, 'tcx>> for SpanData {
     fn decode(decoder: &mut DecodeContext<'a, 'tcx>) -> SpanData {
         let tag = SpanTag::decode(decoder);
-        let ctxt = tag.context().unwrap_or_else(|| SyntaxContext::decode(decoder));
+        let ctxt = tag
+            .context()
+            .unwrap_or_else(|| SyntaxContext::decode(decoder));
 
         if tag.kind() == SpanKind::Partial {
             return DUMMY_SP.with_ctxt(ctxt).data();
@@ -670,7 +692,12 @@ impl<'a, 'tcx> Decodable<DecodeContext<'a, 'tcx>> for SpanData {
         let hi = hi + source_file.translated_source_file.start_pos;
 
         // Do not try to decode parent for foreign spans.
-        SpanData { lo, hi, ctxt, parent: None }
+        SpanData {
+            lo,
+            hi,
+            ctxt,
+            parent: None,
+        }
     }
 }
 
@@ -690,7 +717,11 @@ impl<'a, 'tcx, T> Decodable<DecodeContext<'a, 'tcx>> for LazyArray<T> {
     #[inline]
     fn decode(decoder: &mut DecodeContext<'a, 'tcx>) -> Self {
         let len = decoder.read_usize();
-        if len == 0 { LazyArray::default() } else { decoder.read_lazy_array(len) }
+        if len == 0 {
+            LazyArray::default()
+        } else {
+            decoder.read_lazy_array(len)
+        }
     }
 }
 
@@ -756,7 +787,11 @@ impl MetadataBlob {
             "features".to_owned(),
             "items".to_owned(),
         ];
-        let ls_kinds = if ls_kinds.contains(&"all".to_owned()) { &all_ls_kinds } else { ls_kinds };
+        let ls_kinds = if ls_kinds.contains(&"all".to_owned()) {
+            &all_ls_kinds
+        } else {
+            ls_kinds
+        };
 
         for kind in ls_kinds {
             match &**kind {
@@ -772,7 +807,11 @@ impl MetadataBlob {
                     writeln!(out, "proc_macro {:?}", root.proc_macro_data.is_some())?;
                     writeln!(out, "triple {}", root.header.triple.triple())?;
                     writeln!(out, "edition {}", root.edition)?;
-                    writeln!(out, "symbol_mangling_version {:?}", root.symbol_mangling_version)?;
+                    writeln!(
+                        out,
+                        "symbol_mangling_version {:?}",
+                        root.symbol_mangling_version
+                    )?;
                     writeln!(
                         out,
                         "required_panic_strategy {:?} panic_in_drop_strategy {:?}",
@@ -798,11 +837,19 @@ impl MetadataBlob {
                     )?;
 
                     writeln!(out, "=External Dependencies=")?;
-                    let dylib_dependency_formats =
-                        root.dylib_dependency_formats.decode(self).collect::<Vec<_>>();
+                    let dylib_dependency_formats = root
+                        .dylib_dependency_formats
+                        .decode(self)
+                        .collect::<Vec<_>>();
                     for (i, dep) in root.crate_deps.decode(self).enumerate() {
-                        let CrateDep { name, extra_filename, hash, host_hash, kind, is_private } =
-                            dep;
+                        let CrateDep {
+                            name,
+                            extra_filename,
+                            hash,
+                            host_hash,
+                            kind,
+                            is_private,
+                        } = dep;
                         let number = i + 1;
 
                         writeln!(
@@ -880,21 +927,24 @@ impl MetadataBlob {
                                 .get_opt_name()
                                 .unwrap_or_else(|| Symbol::intern("???"))
                         };
-                        let visibility =
-                            root.tables.visibility.get(blob, item).unwrap().decode(blob).map_id(
-                                |index| {
-                                    format!(
-                                        "crate{}",
-                                        DefPath::make(LOCAL_CRATE, index, |parent| root
-                                            .tables
-                                            .def_keys
-                                            .get(blob, parent)
-                                            .unwrap()
-                                            .decode(blob))
-                                        .to_string_no_crate_verbose()
-                                    )
-                                },
-                            );
+                        let visibility = root
+                            .tables
+                            .visibility
+                            .get(blob, item)
+                            .unwrap()
+                            .decode(blob)
+                            .map_id(|index| {
+                                format!(
+                                    "crate{}",
+                                    DefPath::make(LOCAL_CRATE, index, |parent| root
+                                        .tables
+                                        .def_keys
+                                        .get(blob, parent)
+                                        .unwrap()
+                                        .decode(blob))
+                                    .to_string_no_crate_verbose()
+                                )
+                            });
                         write!(
                             out,
                             "{nil: <indent$}{:?} {:?} {} {{",
@@ -987,7 +1037,10 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
         def_key.disambiguated_data.data.get_opt_name().or_else(|| {
             if def_key.disambiguated_data.data == DefPathData::Ctor {
                 let parent_index = def_key.parent.expect("no parent for a constructor");
-                self.def_key(parent_index).disambiguated_data.data.get_opt_name()
+                self.def_key(parent_index)
+                    .disambiguated_data
+                    .data
+                    .get_opt_name()
             } else {
                 None
             }
@@ -995,7 +1048,8 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
     }
 
     fn item_name(self, item_index: DefIndex) -> Symbol {
-        self.opt_item_name(item_index).expect("no encoded ident for item")
+        self.opt_item_name(item_index)
+            .expect("no encoded ident for item")
     }
 
     fn opt_item_ident(self, item_index: DefIndex, sess: &Session) -> Option<Ident> {
@@ -1011,12 +1065,17 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
     }
 
     fn item_ident(self, item_index: DefIndex, sess: &Session) -> Ident {
-        self.opt_item_ident(item_index, sess).expect("no encoded ident for item")
+        self.opt_item_ident(item_index, sess)
+            .expect("no encoded ident for item")
     }
 
     #[inline]
     pub(super) fn map_encoded_cnum_to_current(self, cnum: CrateNum) -> CrateNum {
-        if cnum == LOCAL_CRATE { self.cnum } else { self.cnum_map[cnum] }
+        if cnum == LOCAL_CRATE {
+            self.cnum
+        } else {
+            self.cnum_map[cnum]
+        }
     }
 
     fn def_kind(self, item_id: DefIndex) -> DefKind {
@@ -1038,21 +1097,32 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
 
     fn load_proc_macro(self, id: DefIndex, tcx: TyCtxt<'tcx>) -> SyntaxExtension {
         let (name, kind, helper_attrs) = match *self.raw_proc_macro(id) {
-            ProcMacro::CustomDerive { trait_name, attributes, client } => {
-                let helper_attrs =
-                    attributes.iter().cloned().map(Symbol::intern).collect::<Vec<_>>();
+            ProcMacro::CustomDerive {
+                trait_name,
+                attributes,
+                client,
+            } => {
+                let helper_attrs = attributes
+                    .iter()
+                    .cloned()
+                    .map(Symbol::intern)
+                    .collect::<Vec<_>>();
                 (
                     trait_name,
                     SyntaxExtensionKind::Derive(Box::new(DeriveProcMacro { client })),
                     helper_attrs,
                 )
             }
-            ProcMacro::Attr { name, client } => {
-                (name, SyntaxExtensionKind::Attr(Box::new(AttrProcMacro { client })), Vec::new())
-            }
-            ProcMacro::Bang { name, client } => {
-                (name, SyntaxExtensionKind::Bang(Box::new(BangProcMacro { client })), Vec::new())
-            }
+            ProcMacro::Attr { name, client } => (
+                name,
+                SyntaxExtensionKind::Attr(Box::new(AttrProcMacro { client })),
+                Vec::new(),
+            ),
+            ProcMacro::Bang { name, client } => (
+                name,
+                SyntaxExtensionKind::Bang(Box::new(BangProcMacro { client })),
+                Vec::new(),
+            ),
         };
 
         let sess = tcx.sess;
@@ -1089,7 +1159,11 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
         index: DefIndex,
         tcx: TyCtxt<'tcx>,
     ) -> ty::EarlyBinder<'tcx, &'tcx [(ty::Clause<'tcx>, Span)]> {
-        let lazy = self.root.tables.explicit_item_super_predicates.get(self, index);
+        let lazy = self
+            .root
+            .tables
+            .explicit_item_super_predicates
+            .get(self, index);
         let output = if lazy.is_default() {
             &mut []
         } else {
@@ -1111,11 +1185,22 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
             _ => bug!(),
         };
 
-        let data = self.root.tables.variant_data.get(self, index).unwrap().decode(self);
+        let data = self
+            .root
+            .tables
+            .variant_data
+            .get(self, index)
+            .unwrap()
+            .decode(self);
 
-        let variant_did =
-            if adt_kind == ty::AdtKind::Enum { Some(self.local_def_id(index)) } else { None };
-        let ctor = data.ctor.map(|(kind, index)| (kind, self.local_def_id(index)));
+        let variant_did = if adt_kind == ty::AdtKind::Enum {
+            Some(self.local_def_id(index))
+        } else {
+            None
+        };
+        let ctor = data
+            .ctor
+            .map(|(kind, index)| (kind, self.local_def_id(index)));
 
         (
             data.idx,
@@ -1151,7 +1236,13 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
             DefKind::Union => ty::AdtKind::Union,
             _ => bug!("get_adt_def called on a non-ADT {:?}", did),
         };
-        let repr = self.root.tables.repr_options.get(self, item_id).unwrap().decode(self);
+        let repr = self
+            .root
+            .tables
+            .repr_options
+            .get(self, item_id)
+            .unwrap()
+            .decode(self);
 
         let mut variants: Vec<_> = if let ty::AdtKind::Enum = adt_kind {
             self.root
@@ -1194,7 +1285,11 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
     }
 
     fn get_trait_item_def_id(self, id: DefIndex) -> Option<DefId> {
-        self.root.tables.trait_item_def_id.get(self, id).map(|d| d.decode_from_cdata(self))
+        self.root
+            .tables
+            .trait_item_def_id
+            .get(self, id)
+            .map(|d| d.decode_from_cdata(self))
     }
 
     fn get_expn_that_defined(self, id: DefIndex, sess: &Session) -> ExpnId {
@@ -1207,7 +1302,10 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
     }
 
     fn get_debugger_visualizers(self) -> Vec<DebuggerVisualizerFile> {
-        self.root.debugger_visualizers.decode(self).collect::<Vec<_>>()
+        self.root
+            .debugger_visualizers
+            .decode(self)
+            .collect::<Vec<_>>()
     }
 
     /// Iterates over all the stability attributes in the given crate.
@@ -1226,7 +1324,8 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
     /// has an `implied_by` meta item, then the mapping from the implied feature to the actual
     /// feature is a stability implication).
     fn get_stability_implications(self, tcx: TyCtxt<'tcx>) -> &'tcx [(Symbol, Symbol)] {
-        tcx.arena.alloc_from_iter(self.root.stability_implications.decode(self))
+        tcx.arena
+            .alloc_from_iter(self.root.stability_implications.decode(self))
     }
 
     /// Iterates over the lang items in the given crate.
@@ -1261,7 +1360,10 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
                 (name, id)
             })
             .collect();
-        DiagnosticItems { id_to_name, name_to_id }
+        DiagnosticItems {
+            id_to_name,
+            name_to_id,
+        }
     }
 
     fn get_mod_child(self, id: DefIndex, sess: &Session) -> ModChild {
@@ -1269,7 +1371,12 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
         let res = Res::Def(self.def_kind(id), self.local_def_id(id));
         let vis = self.get_visibility(id);
 
-        ModChild { ident, res, vis, reexport_chain: Default::default() }
+        ModChild {
+            ident,
+            res,
+            vis,
+            reexport_chain: Default::default(),
+        }
     }
 
     /// Iterates over all named children of the given module,
@@ -1360,8 +1467,12 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
             _ => bug!("cannot get associated-item of `{:?}`", self.def_key(id)),
         };
         let container = self.root.tables.assoc_container.get(self, id).unwrap();
-        let opt_rpitit_info =
-            self.root.tables.opt_rpitit_info.get(self, id).map(|d| d.decode(self));
+        let opt_rpitit_info = self
+            .root
+            .tables
+            .opt_rpitit_info
+            .get(self, id)
+            .map(|d| d.decode(self));
 
         ty::AssocItem {
             name,
@@ -1377,8 +1488,16 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
     fn get_ctor(self, node_id: DefIndex) -> Option<(CtorKind, DefId)> {
         match self.def_kind(node_id) {
             DefKind::Struct | DefKind::Variant => {
-                let vdata = self.root.tables.variant_data.get(self, node_id).unwrap().decode(self);
-                vdata.ctor.map(|(kind, index)| (kind, self.local_def_id(index)))
+                let vdata = self
+                    .root
+                    .tables
+                    .variant_data
+                    .get(self, node_id)
+                    .unwrap()
+                    .decode(self);
+                vdata
+                    .ctor
+                    .map(|(kind, index)| (kind, self.local_def_id(index)))
             }
             _ => None,
         }
@@ -1426,19 +1545,25 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
 
     /// Decodes all traits in the crate (for rustdoc and rustc diagnostics).
     fn get_traits(self) -> impl Iterator<Item = DefId> + 'a {
-        self.root.traits.decode(self).map(move |index| self.local_def_id(index))
+        self.root
+            .traits
+            .decode(self)
+            .map(move |index| self.local_def_id(index))
     }
 
     /// Decodes all trait impls in the crate (for rustdoc).
     fn get_trait_impls(self) -> impl Iterator<Item = DefId> + 'a {
         self.cdata.trait_impls.values().flat_map(move |impls| {
-            impls.decode(self).map(move |(impl_index, _)| self.local_def_id(impl_index))
+            impls
+                .decode(self)
+                .map(move |(impl_index, _)| self.local_def_id(impl_index))
         })
     }
 
     fn get_incoherent_impls(self, tcx: TyCtxt<'tcx>, simp: SimplifiedType) -> &'tcx [DefId] {
         if let Some(impls) = self.cdata.incoherent_impls.get(&simp) {
-            tcx.arena.alloc_from_iter(impls.decode(self).map(|idx| self.local_def_id(idx)))
+            tcx.arena
+                .alloc_from_iter(impls.decode(self).map(|idx| self.local_def_id(idx)))
         } else {
             &[]
         }
@@ -1493,31 +1618,45 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
         tcx: TyCtxt<'tcx>,
     ) -> &'tcx [(CrateNum, LinkagePreference)] {
         tcx.arena.alloc_from_iter(
-            self.root.dylib_dependency_formats.decode(self).enumerate().flat_map(|(i, link)| {
-                let cnum = CrateNum::new(i + 1);
-                link.map(|link| (self.cnum_map[cnum], link))
-            }),
+            self.root
+                .dylib_dependency_formats
+                .decode(self)
+                .enumerate()
+                .flat_map(|(i, link)| {
+                    let cnum = CrateNum::new(i + 1);
+                    link.map(|link| (self.cnum_map[cnum], link))
+                }),
         )
     }
 
     fn get_missing_lang_items(self, tcx: TyCtxt<'tcx>) -> &'tcx [LangItem] {
-        tcx.arena.alloc_from_iter(self.root.lang_items_missing.decode(self))
+        tcx.arena
+            .alloc_from_iter(self.root.lang_items_missing.decode(self))
     }
 
     fn exported_symbols(
         self,
         tcx: TyCtxt<'tcx>,
     ) -> &'tcx [(ExportedSymbol<'tcx>, SymbolExportInfo)] {
-        tcx.arena.alloc_from_iter(self.root.exported_symbols.decode((self, tcx)))
+        tcx.arena
+            .alloc_from_iter(self.root.exported_symbols.decode((self, tcx)))
     }
 
     fn get_macro(self, id: DefIndex, sess: &Session) -> ast::MacroDef {
         match self.def_kind(id) {
             DefKind::Macro(_) => {
                 let macro_rules = self.root.tables.is_macro_rules.get(self, id);
-                let body =
-                    self.root.tables.macro_definition.get(self, id).unwrap().decode((self, sess));
-                ast::MacroDef { macro_rules, body: ast::ptr::P(body) }
+                let body = self
+                    .root
+                    .tables
+                    .macro_definition
+                    .get(self, id)
+                    .unwrap()
+                    .decode((self, sess));
+                ast::MacroDef {
+                    macro_rules,
+                    body: ast::ptr::P(body),
+                }
             }
             _ => bug!(),
         }
@@ -1525,11 +1664,14 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
 
     #[inline]
     fn def_key(self, index: DefIndex) -> DefKey {
-        *self
-            .def_key_cache
-            .lock()
-            .entry(index)
-            .or_insert_with(|| self.root.tables.def_keys.get(self, index).unwrap().decode(self))
+        *self.def_key_cache.lock().entry(index).or_insert_with(|| {
+            self.root
+                .tables
+                .def_keys
+                .get(self, index)
+                .unwrap()
+                .decode(self)
+        })
     }
 
     // Returns the path leading to the thing with this `id`.
@@ -1558,7 +1700,11 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
     fn expn_hash_to_expn_id(self, sess: &Session, index_guess: u32, hash: ExpnHash) -> ExpnId {
         debug_assert_eq!(ExpnId::from_hash(hash), None);
         let index_guess = ExpnIndex::from_u32(index_guess);
-        let old_hash = self.root.expn_hashes.get(self, index_guess).map(|lazy| lazy.decode(self));
+        let old_hash = self
+            .root
+            .expn_hashes
+            .get(self, index_guess)
+            .map(|lazy| lazy.decode(self));
 
         let index = if old_hash == Some(hash) {
             // Fast path: the expn and its index is unchanged from the
@@ -1584,7 +1730,12 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
             map[&hash]
         };
 
-        let data = self.root.expn_data.get(self, index).unwrap().decode((self, sess));
+        let data = self
+            .root
+            .expn_data
+            .get(self, index)
+            .unwrap()
+            .decode((self, sess));
         rustc_span::hygiene::register_expn_id(self.cnum, index, data, hash)
     }
 
@@ -1625,7 +1776,11 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
                 // Don't translate away `/rustc/$hash` if we're still remapping to it,
                 // since that means we're still building `std`/`rustc` that need it,
                 // and we don't want the real path to leak into codegen/debuginfo.
-                !sess.opts.remap_path_prefix.iter().any(|(_from, to)| to == virtual_dir)
+                !sess
+                    .opts
+                    .remap_path_prefix
+                    .iter()
+                    .any(|(_from, to)| to == virtual_dir)
             })
         }
 
@@ -1636,8 +1791,17 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
             // NOTE: if you update this, you might need to also update bootstrap's code for generating
             // the `rust-src` component in `Src::run` in `src/bootstrap/dist.rs`.
             let virtual_rust_source_base_dir = [
-                filter(sess, option_env!("CFG_VIRTUAL_RUST_SOURCE_BASE_DIR").map(Path::new)),
-                filter(sess, sess.opts.unstable_opts.simulate_remapped_rust_src_base.as_deref()),
+                filter(
+                    sess,
+                    option_env!("CFG_VIRTUAL_RUST_SOURCE_BASE_DIR").map(Path::new),
+                ),
+                filter(
+                    sess,
+                    sess.opts
+                        .unstable_opts
+                        .simulate_remapped_rust_src_base
+                        .as_deref(),
+                ),
             ];
 
             debug!(
@@ -1649,8 +1813,10 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
             for virtual_dir in virtual_rust_source_base_dir.iter().flatten() {
                 if let Some(real_dir) = &sess.opts.real_rust_source_base_dir {
                     if let rustc_span::FileName::Real(old_name) = name {
-                        if let rustc_span::RealFileName::Remapped { local_path: _, virtual_name } =
-                            old_name
+                        if let rustc_span::RealFileName::Remapped {
+                            local_path: _,
+                            virtual_name,
+                        } = old_name
                         {
                             if let Ok(rest) = virtual_name.strip_prefix(virtual_dir) {
                                 let virtual_name = virtual_name.clone();
@@ -1750,7 +1916,11 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
                                 .and_then(|virtual_dir| virtual_name.strip_prefix(virtual_dir).ok())
                         }
                     };
-                    debug!(?relative_path, ?virtual_dir, "simulate_remapped_rust_src_base");
+                    debug!(
+                        ?relative_path,
+                        ?virtual_dir,
+                        "simulate_remapped_rust_src_base"
+                    );
                     for subdir in ["library", "compiler"] {
                         if let Some(rest) = relative_path.and_then(|p| p.strip_prefix(subdir).ok())
                         {
@@ -1805,7 +1975,11 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
     }
 
     fn get_intrinsic(self, index: DefIndex) -> Option<ty::IntrinsicDef> {
-        self.root.tables.intrinsic.get(self, index).map(|d| d.decode(self))
+        self.root
+            .tables
+            .intrinsic
+            .get(self, index)
+            .map(|d| d.decode(self))
     }
 
     fn get_doc_link_resolutions(self, index: DefIndex) -> DocLinkResMap {
@@ -1881,7 +2055,10 @@ impl CrateMetadata {
         cdata.incoherent_impls = cdata
             .root
             .incoherent_impls
-            .decode(CrateMetadataRef { cdata: &cdata, cstore })
+            .decode(CrateMetadataRef {
+                cdata: &cdata,
+                cstore,
+            })
             .map(|incoherent_impls| (incoherent_impls.self_ty, incoherent_impls.impls))
             .collect();
 
@@ -1974,7 +2151,10 @@ impl CrateMetadata {
     }
 
     fn local_def_id(&self, index: DefIndex) -> DefId {
-        DefId { krate: self.cnum, index }
+        DefId {
+            krate: self.cnum,
+            index,
+        }
     }
 
     // Translate a DefId from the current compilation environment to a DefId
@@ -1982,7 +2162,10 @@ impl CrateMetadata {
     fn reverse_translate_def_id(&self, did: DefId) -> Option<DefId> {
         for (local, &global) in self.cnum_map.iter_enumerated() {
             if global == did.krate {
-                return Some(DefId { krate: local, index: did.index });
+                return Some(DefId {
+                    krate: local,
+                    index: did.index,
+                });
             }
         }
 

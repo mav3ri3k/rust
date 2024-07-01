@@ -27,10 +27,11 @@ use rustc_span::edition::Edition;
 use rustc_span::symbol::{sym, Symbol};
 use rustc_span::{Span, DUMMY_SP};
 use rustc_target::spec::{PanicStrategy, Target, TargetTriple};
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 
 use proc_macro::bridge::client::ProcMacro;
 use std::error::Error;
+use std::fmt;
 use std::ops::Fn;
 use std::path::Path;
 use std::str::FromStr;
@@ -106,6 +107,15 @@ pub(crate) struct Library {
     pub metadata: MetadataBlob,
 }
 
+impl fmt::Debug for Library {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Point")
+            .field("source", &self.source)
+            .field("metadata", &format_args!("\\('^')/"))
+            .finish()
+    }
+}
+
 enum LoadResult {
     Previous(CrateNum),
     Loaded(Library),
@@ -136,7 +146,12 @@ impl<'a> std::fmt::Debug for CrateDump<'a> {
             writeln!(fmt, "  cnum: {cnum}")?;
             writeln!(fmt, "  hash: {}", data.hash())?;
             writeln!(fmt, "  reqd: {:?}", data.dep_kind())?;
-            let CrateSource { dylib, rlib, rmeta } = data.source();
+            let CrateSource {
+                dylib,
+                rlib,
+                rmeta,
+                wasm,
+            } = data.source();
             if let Some(dylib) = dylib {
                 writeln!(fmt, "  dylib: {}", dylib.0.display())?;
             }
@@ -145,6 +160,9 @@ impl<'a> std::fmt::Debug for CrateDump<'a> {
             }
             if let Some(rmeta) = rmeta {
                 writeln!(fmt, "   rmeta: {}", rmeta.0.display())?;
+            }
+            if let Some(wasm) = wasm {
+                writeln!(fmt, "   wasm: {}", wasm.0.display())?;
             }
         }
         Ok(())
@@ -514,6 +532,68 @@ impl<'a, 'tcx> CrateLoader<'a, 'tcx> {
         Ok(cnum)
     }
 
+    fn load_wasm_pm<'b>(
+        &self,
+        locator: &mut CrateLocator<'b>,
+        path_kind: PathKind,
+        host_hash: Option<Svh>,
+    ) -> Result<Option<(LoadResult, Option<Library>)>, CrateError>
+    where
+        'a: 'b,
+    {
+        warn!("Loading wasm pm function");
+        warn!("Pathkind: {:?}", path_kind);
+        // Use a new crate locator so trying to load a proc macro doesn't affect the error
+        // message we emit
+        let mut wasm_pm_locator = locator.clone();
+
+        // Try to load a proc macro
+        wasm_pm_locator.is_proc_macro = true;
+        wasm_pm_locator.is_wasm_pm = true;
+
+        // Load the proc macro crate for the target
+        let (locator, target_result) = if self.sess.opts.unstable_opts.dual_proc_macros {
+            wasm_pm_locator.reset();
+            let result = match self.load(&mut wasm_pm_locator)? {
+                Some(LoadResult::Previous(cnum)) => {
+                    return Ok(Some((LoadResult::Previous(cnum), None)));
+                }
+                Some(LoadResult::Loaded(library)) => Some(LoadResult::Loaded(library)),
+                None => return Ok(None),
+            };
+            locator.hash = host_hash;
+            // Use the locator when looking for the host proc macro crate, as that is required
+            // so we want it to affect the error message
+            (locator, result)
+        } else {
+            (&mut wasm_pm_locator, None)
+        };
+
+        // Load the proc macro crate for the host
+        locator.reset();
+        locator.is_proc_macro = true;
+        locator.is_wasm_pm = true;
+        locator.target = &self.sess.host;
+        // locator.triple = TargetTriple::from_triple(config::host_triple());
+        locator.filesearch = self.sess.host_filesearch(path_kind);
+
+        let Some(host_result) = self.load(locator)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(if self.sess.opts.unstable_opts.dual_proc_macros {
+            let host_result = match host_result {
+                LoadResult::Previous(..) => {
+                    panic!("host and target proc macros must be loaded in lock-step")
+                }
+                LoadResult::Loaded(library) => library,
+            };
+            (target_result.unwrap(), Some(host_result))
+        } else {
+            (host_result, None)
+        }))
+    }
+
     fn load_proc_macro<'b>(
         &self,
         locator: &mut CrateLocator<'b>,
@@ -579,13 +659,27 @@ impl<'a, 'tcx> CrateLoader<'a, 'tcx> {
         span: Span,
         dep_kind: CrateDepKind,
     ) -> Option<CrateNum> {
+        let fmt_name = format!("{:?}", name);
+        let is_my_macro = if fmt_name == "\"my_macro\"" {
+            println!("Crate Name: {:?}", name);
+            true
+        } else {
+            false
+        };
+
         self.used_extern_options.insert(name);
         match self.maybe_resolve_crate(name, dep_kind, None) {
             Ok(cnum) => {
+                if is_my_macro {
+                    warn!("Crate {:?} assigned cnum", name);
+                }
                 self.cstore.set_used_recursively(cnum);
                 Some(cnum)
             }
             Err(err) => {
+                if is_my_macro {
+                    warn!("Crate {:?} failed assigning cnum", name);
+                }
                 let missing_core = self
                     .maybe_resolve_crate(sym::core, CrateDepKind::Explicit, None)
                     .is_err();
@@ -601,6 +695,14 @@ impl<'a, 'tcx> CrateLoader<'a, 'tcx> {
         mut dep_kind: CrateDepKind,
         dep: Option<(&'b CratePaths, &'b CrateDep)>,
     ) -> Result<CrateNum, CrateError> {
+        let fmt_name = format!("{:?}", name);
+        let is_my_macro = if fmt_name == "\"my_macro\"" {
+            warn!("Maybe resolve Crate Name: {:?}", name);
+            true
+        } else {
+            false
+        };
+
         info!("resolving crate `{}`", name);
         if !name.as_str().is_ascii() {
             return Err(CrateError::NonAsciiName(name));
@@ -620,18 +722,43 @@ impl<'a, 'tcx> CrateLoader<'a, 'tcx> {
             (LoadResult::Previous(cnum), None)
         } else {
             info!("falling back to a load");
-            let mut locator = CrateLocator::new(
-                self.sess,
-                &*self.cstore.metadata_loader,
-                name,
-                // The all loop is because `--crate-type=rlib --crate-type=rlib` is
-                // legal and produces both inside this type.
-                self.tcx.crate_types().iter().all(|c| *c == CrateType::Rlib),
-                hash,
-                extra_filename,
-                false, // is_host
-                path_kind,
-            );
+            let mut locator = if is_my_macro {
+                CrateLocator::new(
+                    self.sess,
+                    &*self.cstore.metadata_loader,
+                    name,
+                    // The all loop is because `--crate-type=rlib --crate-type=rlib` is
+                    // legal and produces both inside this type.
+                    self.tcx.crate_types().iter().all(|c| *c == CrateType::Rlib),
+                    hash,
+                    extra_filename,
+                    false, // is_host
+                    PathKind::ExternFlag,
+                )
+            } else {
+                CrateLocator::new(
+                    self.sess,
+                    &*self.cstore.metadata_loader,
+                    name,
+                    // The all loop is because `--crate-type=rlib --crate-type=rlib` is
+                    // legal and produces both inside this type.
+                    self.tcx.crate_types().iter().all(|c| *c == CrateType::Rlib),
+                    hash,
+                    extra_filename,
+                    false, // is_host
+                    path_kind,
+                )
+            };
+
+            if is_my_macro {
+                warn!(
+                    "Name: {:?}, hash: {:?}, is_rlib: {:?}, path_kind: {:?}",
+                    name,
+                    hash,
+                    self.tcx.crate_types().iter().all(|c| *c == CrateType::Rlib),
+                    path_kind
+                );
+            }
 
             match self.load(&mut locator)? {
                 Some(res) => (res, None),
@@ -639,7 +766,17 @@ impl<'a, 'tcx> CrateLoader<'a, 'tcx> {
                     dep_kind = CrateDepKind::MacrosOnly;
                     match self.load_proc_macro(&mut locator, path_kind, host_hash)? {
                         Some(res) => res,
-                        None => return Err(locator.into_error(root.cloned())),
+                        None => {
+                            // INFO Try loading wasms pm
+                            match self.load_wasm_pm(&mut locator, path_kind, host_hash)? {
+                                Some(res) => res,
+                                None => {
+                                    warn!("Failed loading wasm pm");
+                                    warn!("Path kind: {:?}, Host hash:{:?}", path_kind, host_hash);
+                                    return Err(locator.into_error(root.cloned()));
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -668,9 +805,25 @@ impl<'a, 'tcx> CrateLoader<'a, 'tcx> {
     }
 
     fn load(&self, locator: &mut CrateLocator<'_>) -> Result<Option<LoadResult>, CrateError> {
+
+        let fmt_name = format!("{:?}", locator.crate_name);
+        let is_my_macro = if fmt_name == "\"my_macro\"" {
+            debug!("Inside load fn, Crate Name: {:?}", locator.crate_name);
+            true
+        } else {
+            false
+        };
+
         let Some(library) = locator.maybe_load_library_crate()? else {
+            if is_my_macro {
+                warn!("Could not load warm library");
+            };
             return Ok(None);
         };
+
+        if locator.is_wasm_pm {
+            warn!("Looking for wasm pm, library loaded");
+        }
 
         // In the case that we're loading a crate, but not matching
         // against a hash, we could load a crate which has the same hash

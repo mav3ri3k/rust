@@ -231,7 +231,7 @@ use rustc_session::Session;
 use rustc_span::symbol::Symbol;
 use rustc_span::Span;
 use rustc_target::spec::{Target, TargetTriple};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use snap::read::FrameDecoder;
 use std::borrow::Cow;
@@ -249,7 +249,9 @@ pub(crate) struct CrateLocator<'a> {
     cfg_version: &'static str,
 
     // Immutable per-search configuration.
-    crate_name: Symbol,
+    // FIXME
+    // WARN REMOVE PUB
+    pub crate_name: Symbol,
     exact_paths: Vec<CanonicalizedPath>,
     pub hash: Option<Svh>,
     extra_filename: Option<&'a str>,
@@ -257,6 +259,8 @@ pub(crate) struct CrateLocator<'a> {
     pub triple: TargetTriple,
     pub filesearch: FileSearch<'a>,
     pub is_proc_macro: bool,
+    #[allow(dead_code)]
+    pub is_wasm_pm: bool,
 
     // Mutable in-progress state or output.
     crate_rejections: CrateRejections,
@@ -279,6 +283,7 @@ pub(crate) enum CrateFlavor {
     Rlib,
     Rmeta,
     Dylib,
+    Wasm,
 }
 
 impl fmt::Display for CrateFlavor {
@@ -287,6 +292,7 @@ impl fmt::Display for CrateFlavor {
             CrateFlavor::Rlib => "rlib",
             CrateFlavor::Rmeta => "rmeta",
             CrateFlavor::Dylib => "dylib",
+            CrateFlavor::Wasm => "wasm",
         })
     }
 }
@@ -297,6 +303,7 @@ impl IntoDiagArg for CrateFlavor {
             CrateFlavor::Rlib => DiagArgValue::Str(Cow::Borrowed("rlib")),
             CrateFlavor::Rmeta => DiagArgValue::Str(Cow::Borrowed("rmeta")),
             CrateFlavor::Dylib => DiagArgValue::Str(Cow::Borrowed("dylib")),
+            CrateFlavor::Wasm => DiagArgValue::Str(Cow::Borrowed("wasm")),
         }
     }
 }
@@ -352,6 +359,7 @@ impl<'a> CrateLocator<'a> {
                 sess.target_filesearch(path_kind)
             },
             is_proc_macro: false,
+            is_wasm_pm: false,
             crate_rejections: CrateRejections::default(),
         }
     }
@@ -366,7 +374,18 @@ impl<'a> CrateLocator<'a> {
     }
 
     pub(crate) fn maybe_load_library_crate(&mut self) -> Result<Option<Library>, CrateError> {
+        let fmt_name = format!("{:?}", self.crate_name);
+        let is_my_macro = if fmt_name == "\"my_macro\"" {
+            info!("Inside load fn, Crate Name: {:?}", self.crate_name);
+            true
+        } else {
+            false
+        };
+
         if !self.exact_paths.is_empty() {
+            if is_my_macro {
+                warn!("Exact path for wasm blob exits");
+            }
             return self.find_commandline_library();
         }
         let mut seen_paths = FxHashSet::default();
@@ -389,6 +408,7 @@ impl<'a> CrateLocator<'a> {
             "{}{}{}",
             self.target.dll_prefix, self.crate_name, extra_prefix
         );
+        let wasm_prefix = &format!("pm{}{}", self.crate_name, extra_prefix);
         let staticlib_prefix = &format!(
             "{}{}{}",
             self.target.staticlib_prefix, self.crate_name, extra_prefix
@@ -398,9 +418,17 @@ impl<'a> CrateLocator<'a> {
         let rlib_suffix = ".rlib";
         let dylib_suffix = &self.target.dll_suffix;
         let staticlib_suffix = &self.target.staticlib_suffix;
+        let wasm_suffix = ".wasm";
 
-        let mut candidates: FxHashMap<_, (FxHashMap<_, _>, FxHashMap<_, _>, FxHashMap<_, _>)> =
-            Default::default();
+        let mut candidates: FxHashMap<
+            _,
+            (
+                FxHashMap<_, _>,
+                FxHashMap<_, _>,
+                FxHashMap<_, _>,
+                FxHashMap<_, _>,
+            ),
+        > = Default::default();
 
         // First, find all possible candidate rlibs and dylibs purely based on
         // the name of the files themselves. We're trying to match against an
@@ -423,9 +451,9 @@ impl<'a> CrateLocator<'a> {
         // option and thus can be anything, and the incorrect match will be
         // handled safely in `extract_one`.
         for search_path in self.filesearch.search_paths() {
-            debug!("searching {}", search_path.dir.display());
+            info!("searching {}", search_path.dir.display());
             for spf in search_path.files.iter() {
-                debug!("testing {}", spf.path.display());
+                info!("testing {}", spf.path.display());
 
                 let f = &spf.file_name_str;
                 let (hash, kind) = if f.starts_with(rlib_prefix) && f.ends_with(rlib_suffix) {
@@ -443,6 +471,12 @@ impl<'a> CrateLocator<'a> {
                         &f[dylib_prefix.len()..(f.len() - dylib_suffix.len())],
                         CrateFlavor::Dylib,
                     )
+                } else if f.starts_with(wasm_prefix) && f.ends_with(wasm_suffix) {
+                    info!("Returning pm_wasm (hash, kind)");
+                    (
+                        &f[wasm_prefix.len()..(f.len() - wasm_suffix.len())],
+                        CrateFlavor::Wasm,
+                    )
                 } else {
                     if f.starts_with(staticlib_prefix) && f.ends_with(staticlib_suffix.as_ref()) {
                         self.crate_rejections.via_kind.push(CrateMismatch {
@@ -455,7 +489,8 @@ impl<'a> CrateLocator<'a> {
 
                 info!("lib candidate: {}", spf.path.display());
 
-                let (rlibs, rmetas, dylibs) = candidates.entry(hash.to_string()).or_default();
+                let (rlibs, rmetas, dylibs, wasms) =
+                    candidates.entry(hash.to_string()).or_default();
                 let path = try_canonicalize(&spf.path).unwrap_or_else(|_| spf.path.clone());
                 if seen_paths.contains(&path) {
                     continue;
@@ -465,6 +500,7 @@ impl<'a> CrateLocator<'a> {
                     CrateFlavor::Rlib => rlibs.insert(path, search_path.kind),
                     CrateFlavor::Rmeta => rmetas.insert(path, search_path.kind),
                     CrateFlavor::Dylib => dylibs.insert(path, search_path.kind),
+                    CrateFlavor::Wasm => wasms.insert(path, search_path.kind),
                 };
             }
         }
@@ -478,8 +514,8 @@ impl<'a> CrateLocator<'a> {
         // libraries corresponds to the crate id and hash criteria that this
         // search is being performed for.
         let mut libraries = FxHashMap::default();
-        for (_hash, (rlibs, rmetas, dylibs)) in candidates {
-            if let Some((svh, lib)) = self.extract_lib(rlibs, rmetas, dylibs)? {
+        for (_hash, (rlibs, rmetas, dylibs, wasms)) in candidates {
+            if let Some((svh, lib)) = self.extract_lib(rlibs, rmetas, dylibs, wasms)? {
                 libraries.insert(svh, lib);
             }
         }
@@ -514,6 +550,7 @@ impl<'a> CrateLocator<'a> {
         rlibs: FxHashMap<PathBuf, PathKind>,
         rmetas: FxHashMap<PathBuf, PathKind>,
         dylibs: FxHashMap<PathBuf, PathKind>,
+        wasms: FxHashMap<PathBuf, PathKind>,
     ) -> Result<Option<(Svh, Library)>, CrateError> {
         let mut slot = None;
         // Order here matters, rmeta should come first. See comment in
@@ -522,12 +559,18 @@ impl<'a> CrateLocator<'a> {
             rmeta: self.extract_one(rmetas, CrateFlavor::Rmeta, &mut slot)?,
             rlib: self.extract_one(rlibs, CrateFlavor::Rlib, &mut slot)?,
             dylib: self.extract_one(dylibs, CrateFlavor::Dylib, &mut slot)?,
+            wasm: self.extract_one(wasms, CrateFlavor::Wasm, &mut slot)?,
         };
         Ok(slot.map(|(svh, metadata, _)| (svh, Library { source, metadata })))
     }
 
+    // INFO : might be used later when calling proc_macro
     fn needs_crate_flavor(&self, flavor: CrateFlavor) -> bool {
         if flavor == CrateFlavor::Dylib && self.is_proc_macro {
+            return true;
+        }
+
+        if flavor == CrateFlavor::Wasm {
             return true;
         }
 
@@ -555,6 +598,32 @@ impl<'a> CrateLocator<'a> {
         flavor: CrateFlavor,
         slot: &mut Option<(Svh, MetadataBlob, PathBuf)>,
     ) -> Result<Option<(PathBuf, PathKind)>, CrateError> {
+        let fmt_name = format!("{:?}", self.crate_name);
+        let is_my_macro = if fmt_name == "\"my_macro\"" {
+            info!("Inside load fn, Crate Name: {:?}", self.crate_name);
+            true
+        } else {
+            false
+        };
+
+        // WARN temporary thing for wasm files
+        // WARN just take first match
+        // WARN assume this is first time seeing this
+        // WARN also do not update slot
+        if flavor == CrateFlavor::Wasm {
+            // WARN I think this only works because of assumption
+            // WARN that it would iter
+            let Some((pathbuf, pathkind)) = m.iter().next() else {
+                if is_my_macro {
+                    warn!("this should not be none");
+                };
+                return Ok(None);
+            };
+            let ret = (pathbuf.clone(), pathkind.clone());
+            info!("Extracting wasm blob. Result: {:?}", ret);
+            return Ok(Some(ret));
+        }
+
         // If we are producing an rlib, and we've already loaded metadata, then
         // we should not attempt to discover further crate sources (unless we're
         // locating a proc macro; exact logic is in needs_crate_flavor). This means
@@ -673,6 +742,9 @@ impl<'a> CrateLocator<'a> {
                     continue;
                 }
             }
+            if flavor == CrateFlavor::Wasm {
+                info!("Hash: {}, Metadata: \\('^')/", hash);
+            }
             *slot = Some((hash, metadata, lib.clone()));
             ret = Some((lib, kind));
         }
@@ -734,19 +806,30 @@ impl<'a> CrateLocator<'a> {
     }
 
     fn find_commandline_library(&mut self) -> Result<Option<Library>, CrateError> {
+        let fmt_name = format!("{:?}", self.crate_name);
+        let is_my_macro = if fmt_name == "\"my_macro\"" {
+            info!("Inside load fn, Crate Name: {:?}", self.crate_name);
+            true
+        } else {
+            false
+        };
+
         // First, filter out all libraries that look suspicious. We only accept
         // files which actually exist that have the correct naming scheme for
         // rlibs/dylibs.
         let mut rlibs = FxHashMap::default();
         let mut rmetas = FxHashMap::default();
         let mut dylibs = FxHashMap::default();
+        let mut wasms = FxHashMap::default();
         for loc in &self.exact_paths {
+            /*
             if loc.canonicalized().extension().unwrap() == "wasm" {
                 return Err(CrateError::ExternLocationWasmArtifact(
                     self.crate_name,
                     loc.original().clone(),
                 ));
             }
+            */
             if !loc.canonicalized().exists() {
                 return Err(CrateError::ExternLocationNotExist(
                     self.crate_name,
@@ -769,6 +852,7 @@ impl<'a> CrateLocator<'a> {
             if file.starts_with("lib") && (file.ends_with(".rlib") || file.ends_with(".rmeta"))
                 || file.starts_with(self.target.dll_prefix.as_ref())
                     && file.ends_with(self.target.dll_suffix.as_ref())
+                || (file.starts_with("pm") && file.ends_with(".wasm"))
             {
                 // Make sure there's at most one rlib and at most one dylib.
                 // Note to take care and match against the non-canonicalized name:
@@ -795,6 +879,15 @@ impl<'a> CrateLocator<'a> {
                     .ends_with(".rmeta")
                 {
                     rmetas.insert(loc_canon, PathKind::ExternFlag);
+                } else if loc
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .ends_with(".wasm")
+                {
+                    wasms.insert(loc_canon, PathKind::ExternFlag);
+                    info!("Wasm file found");
                 } else {
                     dylibs.insert(loc_canon, PathKind::ExternFlag);
                 }
@@ -806,8 +899,14 @@ impl<'a> CrateLocator<'a> {
             }
         }
 
-        // Extract the dylib/rlib/rmeta triple.
-        Ok(self.extract_lib(rlibs, rmetas, dylibs)?.map(|(_, lib)| lib))
+        // Extract the dylib/rlib/rmeta/wasm quadrapule.
+        let library = self
+            .extract_lib(rlibs, rmetas, dylibs, wasms)?
+            .map(|(_, lib)| lib);
+        if is_my_macro {
+            info!("Library found: {:?}", library);
+        };
+        return Ok(library);
     }
 
     pub(crate) fn into_error(self, root: Option<CratePaths>) -> CrateError {
@@ -909,6 +1008,11 @@ fn get_metadata_section<'p>(
 
             slice_owned(mmap, Deref::deref)
         }
+        CrateFlavor::Wasm => {
+            let empty_vec: Vec<u8> = Vec::new();
+            info!("Getting metadata for wasm artifact");
+            slice_owned(empty_vec, Deref::deref)
+        }
     };
     let Ok(blob) = MetadataBlob::new(raw_bytes) else {
         return Err(MetadataError::LoadFailure(format!(
@@ -992,6 +1096,7 @@ pub(crate) struct CombinedLocatorError {
 pub(crate) enum CrateError {
     NonAsciiName(Symbol),
     ExternLocationNotExist(Symbol, PathBuf),
+    #[allow(dead_code)]
     ExternLocationWasmArtifact(Symbol, PathBuf),
     ExternLocationNotFile(Symbol, PathBuf),
     MultipleCandidates(Symbol, CrateFlavor, Vec<PathBuf>),
