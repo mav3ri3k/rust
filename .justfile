@@ -10,3 +10,7 @@ alias cre := check_rustc_expand
 # run check for rustc_expand
 check_rustc_expand:
 	x check rustc_expand
+
+# ./x build --stage 1 rustc_metadata
+brm:
+	./x build --stage 1 rustc_metadata	

@@ -216,6 +216,7 @@ use crate::creader::{Library, MetadataLoader};
 use crate::errors;
 use crate::rmeta::{rustc_version, MetadataBlob, METADATA_HEADER};
 
+use rustc_data_structures::fingerprint::Fingerprint;
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_data_structures::memmap::Mmap;
 use rustc_data_structures::owned_slice::slice_owned;
@@ -278,7 +279,7 @@ impl CratePaths {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub(crate) enum CrateFlavor {
     Rlib,
     Rmeta,
@@ -384,7 +385,7 @@ impl<'a> CrateLocator<'a> {
 
         if !self.exact_paths.is_empty() {
             if is_my_macro {
-                warn!("Exact path for wasm blob exits");
+                info!("Exact path for wasm blob exits");
             }
             return self.find_commandline_library();
         }
@@ -552,6 +553,14 @@ impl<'a> CrateLocator<'a> {
         dylibs: FxHashMap<PathBuf, PathKind>,
         wasms: FxHashMap<PathBuf, PathKind>,
     ) -> Result<Option<(Svh, Library)>, CrateError> {
+        let fmt_name = format!("{:?}", self.crate_name);
+        let is_my_macro = if fmt_name == "\"my_macro\"" {
+            info!("Extracting lib fn, Crate Name: {:?}", self.crate_name);
+            true
+        } else {
+            false
+        };
+
         let mut slot = None;
         // Order here matters, rmeta should come first. See comment in
         // `extract_one` below.
@@ -561,16 +570,37 @@ impl<'a> CrateLocator<'a> {
             dylib: self.extract_one(dylibs, CrateFlavor::Dylib, &mut slot)?,
             wasm: self.extract_one(wasms, CrateFlavor::Wasm, &mut slot)?,
         };
-        Ok(slot.map(|(svh, metadata, _)| (svh, Library { source, metadata })))
+
+        if is_my_macro {
+            info!("Source: {:?}", source);
+        };
+
+        // INFO
+        // slot: &mut (Svh, MetadataBlob, PathBuf),
+
+        let res = slot.map(|(svh, metadata, _)| (svh, Library { source, metadata }));
+        match res {
+            Some(r) => {
+                if is_my_macro {
+                    info!("Returning lib");
+                };
+                Ok(Some(r))
+            }
+            None => {
+                if is_my_macro {
+                    info!("Returning none");
+                };
+                Ok(None)
+            }
+        }
     }
 
-    // INFO : might be used later when calling proc_macro
     fn needs_crate_flavor(&self, flavor: CrateFlavor) -> bool {
         if flavor == CrateFlavor::Dylib && self.is_proc_macro {
             return true;
         }
 
-        if flavor == CrateFlavor::Wasm {
+        if flavor == CrateFlavor::Wasm && self.is_proc_macro {
             return true;
         }
 
@@ -600,7 +630,10 @@ impl<'a> CrateLocator<'a> {
     ) -> Result<Option<(PathBuf, PathKind)>, CrateError> {
         let fmt_name = format!("{:?}", self.crate_name);
         let is_my_macro = if fmt_name == "\"my_macro\"" {
-            info!("Inside load fn, Crate Name: {:?}", self.crate_name);
+            info!(
+                "Extracting one fn, Crate Name: {:?}, Flavor: {:?}",
+                self.crate_name, flavor
+            );
             true
         } else {
             false
@@ -619,6 +652,33 @@ impl<'a> CrateLocator<'a> {
                 };
                 return Ok(None);
             };
+
+            info!("Path:{:?}, Pathkind: {:?}", pathbuf, pathkind);
+            info!("Metadata: Loading");
+            let large_num = 13333333333333333333;
+            let sudo_hash = Svh::new(Fingerprint::new(large_num, large_num));
+
+            info!("Getting metadata for wasm artifact");
+            let sudo_metadata = match get_metadata_section(
+                self.target,
+                flavor,
+                &pathbuf,
+                self.metadata_loader,
+                self.cfg_version,
+            ) {
+                Ok(blob) => {
+                    info!("Metadata: Loaded");
+                    blob
+                }
+                Err(_) => {
+                    warn!("Metadata not found");
+                    return Ok(None);
+                }
+            };
+
+            info!("Updating slot");
+            *slot = Some((sudo_hash, sudo_metadata, pathbuf.clone()));
+
             let ret = (pathbuf.clone(), pathkind.clone());
             info!("Extracting wasm blob. Result: {:?}", ret);
             return Ok(Some(ret));
@@ -808,7 +868,7 @@ impl<'a> CrateLocator<'a> {
     fn find_commandline_library(&mut self) -> Result<Option<Library>, CrateError> {
         let fmt_name = format!("{:?}", self.crate_name);
         let is_my_macro = if fmt_name == "\"my_macro\"" {
-            info!("Inside load fn, Crate Name: {:?}", self.crate_name);
+            info!("Inside find_cmd_lib fn, Crate Name: {:?}", self.crate_name);
             true
         } else {
             false
