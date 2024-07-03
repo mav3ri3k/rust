@@ -17,4 +17,4 @@ brm:
 
 # git push origin HEAD:wpm --no-verify
 push:
-	 git push origin HEAD:wpm --no-verify
+	git push origin HEAD:wpm --no-verify
