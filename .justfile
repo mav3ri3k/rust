@@ -14,3 +14,7 @@ check_rustc_expand:
 # ./x build --stage 1 rustc_metadata
 brm:
 	./x build --stage 1 rustc_metadata	
+
+# git push origin HEAD:wpm --no-verify
+push:
+	 git push origin HEAD:wpm --no-verify
