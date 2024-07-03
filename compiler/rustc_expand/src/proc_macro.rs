@@ -2,6 +2,9 @@ use crate::base::{self, *};
 use crate::errors;
 use crate::proc_macro_server;
 
+#[allow(unused_imports)]
+use wpm_proc_macro;
+
 use rustc_ast as ast;
 use rustc_ast::ptr::P;
 use rustc_ast::token;
@@ -22,7 +25,10 @@ impl<T> pm::bridge::server::MessagePipe<T> for MessagePipe<T> {
     fn new() -> (Self, Self) {
         let (tx1, rx1) = std::sync::mpsc::sync_channel(1);
         let (tx2, rx2) = std::sync::mpsc::sync_channel(1);
-        (MessagePipe { tx: tx1, rx: rx2 }, MessagePipe { tx: tx2, rx: rx1 })
+        (
+            MessagePipe { tx: tx1, rx: rx2 },
+            MessagePipe { tx: tx2, rx: rx1 },
+        )
     }
 
     fn send(&mut self, value: T) {
@@ -53,21 +59,29 @@ impl base::BangProcMacro for BangProcMacro {
         input: TokenStream,
     ) -> Result<TokenStream, ErrorGuaranteed> {
         let _timer =
-            ecx.sess.prof.generic_activity_with_arg_recorder("expand_proc_macro", |recorder| {
-                recorder.record_arg_with_span(ecx.sess.source_map(), ecx.expansion_descr(), span);
-            });
+            ecx.sess
+                .prof
+                .generic_activity_with_arg_recorder("expand_proc_macro", |recorder| {
+                    recorder.record_arg_with_span(
+                        ecx.sess.source_map(),
+                        ecx.expansion_descr(),
+                        span,
+                    );
+                });
 
         let proc_macro_backtrace = ecx.ecfg.proc_macro_backtrace;
         let strategy = exec_strategy(ecx);
         let server = proc_macro_server::Rustc::new(ecx);
-        self.client.run(&strategy, server, input, proc_macro_backtrace).map_err(|e| {
-            ecx.dcx().emit_err(errors::ProcMacroPanicked {
-                span,
-                message: e
-                    .as_str()
-                    .map(|message| errors::ProcMacroPanickedHelp { message: message.into() }),
+        self.client
+            .run(&strategy, server, input, proc_macro_backtrace)
+            .map_err(|e| {
+                ecx.dcx().emit_err(errors::ProcMacroPanicked {
+                    span,
+                    message: e.as_str().map(|message| errors::ProcMacroPanickedHelp {
+                        message: message.into(),
+                    }),
+                })
             })
-        })
     }
 }
 
@@ -84,23 +98,37 @@ impl base::AttrProcMacro for AttrProcMacro {
         annotated: TokenStream,
     ) -> Result<TokenStream, ErrorGuaranteed> {
         let _timer =
-            ecx.sess.prof.generic_activity_with_arg_recorder("expand_proc_macro", |recorder| {
-                recorder.record_arg_with_span(ecx.sess.source_map(), ecx.expansion_descr(), span);
-            });
+            ecx.sess
+                .prof
+                .generic_activity_with_arg_recorder("expand_proc_macro", |recorder| {
+                    recorder.record_arg_with_span(
+                        ecx.sess.source_map(),
+                        ecx.expansion_descr(),
+                        span,
+                    );
+                });
 
         let proc_macro_backtrace = ecx.ecfg.proc_macro_backtrace;
         let strategy = exec_strategy(ecx);
         let server = proc_macro_server::Rustc::new(ecx);
-        self.client.run(&strategy, server, annotation, annotated, proc_macro_backtrace).map_err(
-            |e| {
+        self.client
+            .run(
+                &strategy,
+                server,
+                annotation,
+                annotated,
+                proc_macro_backtrace,
+            )
+            .map_err(|e| {
                 ecx.dcx().emit_err(errors::CustomAttributePanicked {
                     span,
-                    message: e.as_str().map(|message| errors::CustomAttributePanickedHelp {
-                        message: message.into(),
-                    }),
+                    message: e
+                        .as_str()
+                        .map(|message| errors::CustomAttributePanickedHelp {
+                            message: message.into(),
+                        }),
                 })
-            },
-        )
+            })
     }
 }
 
@@ -134,24 +162,31 @@ impl MultiItemModifier for DeriveProcMacro {
 
         let stream = {
             let _timer =
-                ecx.sess.prof.generic_activity_with_arg_recorder("expand_proc_macro", |recorder| {
-                    recorder.record_arg_with_span(
-                        ecx.sess.source_map(),
-                        ecx.expansion_descr(),
-                        span,
-                    );
-                });
+                ecx.sess
+                    .prof
+                    .generic_activity_with_arg_recorder("expand_proc_macro", |recorder| {
+                        recorder.record_arg_with_span(
+                            ecx.sess.source_map(),
+                            ecx.expansion_descr(),
+                            span,
+                        );
+                    });
             let proc_macro_backtrace = ecx.ecfg.proc_macro_backtrace;
             let strategy = exec_strategy(ecx);
             let server = proc_macro_server::Rustc::new(ecx);
-            match self.client.run(&strategy, server, input, proc_macro_backtrace) {
+            match self
+                .client
+                .run(&strategy, server, input, proc_macro_backtrace)
+            {
                 Ok(stream) => stream,
                 Err(e) => {
                     ecx.dcx().emit_err({
                         errors::ProcMacroDerivePanicked {
                             span,
                             message: e.as_str().map(|message| {
-                                errors::ProcMacroDerivePanickedHelp { message: message.into() }
+                                errors::ProcMacroDerivePanickedHelp {
+                                    message: message.into(),
+                                }
                             }),
                         }
                     });
