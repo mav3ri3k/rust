@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -e
+(
+    cd ../wasm-proc-macro
+    cargo build --release
+)
+(
+    cd ../pmacro1
+    cargo build
+)
+
+# We need this file for the metadata. It needs to contain a macro with the same name as our wasm proc-macro.
+cp ../pmacro1/target/debug/libpmacro1.so .
+
+# This contains the actual wasm code that will be run.
+cp ../wasm-proc-macro/target/wasm32-wasip1/release/wasm_proc_macro.wasm libpmacro1.wpm
+
+RUSTC_WASM_PROC_MACRO_LOADER=$PWD/../wasm-proc-macro-loader/target/debug/libwasm_proc_macro_loader.so
+if [ ! -f "$RUSTC_WASM_PROC_MACRO_LOADER" ]; then
+    echo "Please run cargo build in wasm-proc-macro-loader first" >&2
+    exit 1
+fi
+rustc +stage1 --edition 2021 --extern pmacro1=libpmacro1.wpm main.rs -o a.out
+./a.out

@@ -2,6 +2,7 @@
 
 use super::*;
 
+use client::WasmProcMacroRef;
 use std::cell::Cell;
 use std::marker::PhantomData;
 
@@ -213,6 +214,15 @@ pub trait ExecutionStrategy {
         run_client: extern "C" fn(BridgeConfig<'_>) -> Buffer,
         force_show_panics: bool,
     ) -> Buffer;
+
+    fn run_wasm_bridge_and_client(
+        &self,
+        dispatcher: &mut impl DispatcherTrait,
+        input: Buffer,
+        run_client: extern "C" fn(BridgeConfig<'_>, WasmProcMacroRef) -> Buffer,
+        macro_ref: WasmProcMacroRef,
+        force_show_panics: bool,
+    ) -> Buffer;
 }
 
 thread_local! {
@@ -280,6 +290,27 @@ where
             SameThread.run_bridge_and_client(dispatcher, input, run_client, force_show_panics)
         }
     }
+
+    fn run_wasm_bridge_and_client(
+        &self,
+        dispatcher: &mut impl DispatcherTrait,
+        input: Buffer,
+        run_client: extern "C" fn(BridgeConfig<'_>, WasmProcMacroRef) -> Buffer,
+        macro_ref: WasmProcMacroRef,
+        force_show_panics: bool,
+    ) -> Buffer {
+        if self.cross_thread || ALREADY_RUNNING_SAME_THREAD.get() {
+            <CrossThread<P>>::new().run_wasm_bridge_and_client(
+                dispatcher,
+                input,
+                run_client,
+                macro_ref,
+                force_show_panics,
+            )
+        } else {
+            SameThread.run_wasm_bridge_and_client(dispatcher, input, run_client, macro_ref, force_show_panics)
+        }
+    }
 }
 
 pub struct SameThread;
@@ -302,6 +333,26 @@ impl ExecutionStrategy for SameThread {
             force_show_panics,
             _marker: marker::PhantomData,
         })
+    }
+
+    fn run_wasm_bridge_and_client(
+        &self,
+        dispatcher: &mut impl DispatcherTrait,
+        input: Buffer,
+        run_client: extern "C" fn(BridgeConfig<'_>, WasmProcMacroRef) -> Buffer,
+        macro_ref: WasmProcMacroRef,
+        force_show_panics: bool,
+    ) -> Buffer {
+        let _guard = RunningSameThreadGuard::new();
+
+        let mut dispatch = |buf| dispatcher.dispatch(buf);
+
+        macro_ref.invoke(BridgeConfig {
+            input,
+            dispatch: (&mut dispatch).into(),
+            force_show_panics,
+            _marker: marker::PhantomData,
+        }, run_client)
     }
 }
 
@@ -338,6 +389,37 @@ where
                 force_show_panics,
                 _marker: marker::PhantomData,
             })
+        });
+
+        while let Some(b) = server.recv() {
+            server.send(dispatcher.dispatch(b));
+        }
+
+        join_handle.join().unwrap()
+    }
+
+    fn run_wasm_bridge_and_client(
+        &self,
+        dispatcher: &mut impl DispatcherTrait,
+        input: Buffer,
+        run_client: extern "C" fn(BridgeConfig<'_>, WasmProcMacroRef) -> Buffer,
+        macro_ref: WasmProcMacroRef,
+        force_show_panics: bool,
+    ) -> Buffer {
+        let (mut server, mut client) = P::new();
+
+        let join_handle = thread::spawn(move || {
+            let mut dispatch = |b: Buffer| -> Buffer {
+                client.send(b);
+                client.recv().expect("server died while client waiting for reply")
+            };
+
+            macro_ref.invoke(BridgeConfig {
+                input,
+                dispatch: (&mut dispatch).into(),
+                force_show_panics,
+                _marker: marker::PhantomData,
+            }, run_client)
         });
 
         while let Some(b) = server.recv() {
@@ -384,6 +466,32 @@ fn run_server<
     (globals, input).encode(&mut buf, &mut dispatcher.handle_store);
 
     buf = strategy.run_bridge_and_client(&mut dispatcher, buf, run_client, force_show_panics);
+
+    Result::decode(&mut &buf[..], &mut dispatcher.handle_store)
+}
+
+fn run_wasm_server<
+    S: Server,
+    I: Encode<HandleStore<MarkedTypes<S>>>,
+    O: for<'a, 's> DecodeMut<'a, 's, HandleStore<MarkedTypes<S>>>,
+>(
+    strategy: &impl ExecutionStrategy,
+    handle_counters: &'static client::HandleCounters,
+    server: S,
+    input: I,
+    run_client: extern "C" fn(BridgeConfig<'_>, WasmProcMacroRef) -> Buffer,
+    macro_ref: WasmProcMacroRef,
+    force_show_panics: bool,
+) -> Result<O, PanicMessage> {
+    let mut dispatcher =
+        Dispatcher { handle_store: HandleStore::new(handle_counters), server: MarkedTypes(server) };
+
+    let globals = dispatcher.server.globals();
+
+    let mut buf = Buffer::new();
+    (globals, input).encode(&mut buf, &mut dispatcher.handle_store);
+
+    buf = strategy.run_wasm_bridge_and_client(&mut dispatcher, buf, run_client, macro_ref, force_show_panics);
 
     Result::decode(&mut &buf[..], &mut dispatcher.handle_store)
 }
@@ -436,6 +544,32 @@ impl client::Client<(crate::TokenStream, crate::TokenStream), crate::TokenStream
                 <MarkedTypes<S> as Types>::TokenStream::mark(input2),
             ),
             run,
+            force_show_panics,
+        )
+        .map(|s| <Option<<MarkedTypes<S> as Types>::TokenStream>>::unmark(s).unwrap_or_default())
+    }
+}
+
+impl client::WasmClient<crate::TokenStream, crate::TokenStream> {
+    pub fn run<S>(
+        &self,
+        strategy: &impl ExecutionStrategy,
+        server: S,
+        input: S::TokenStream,
+        force_show_panics: bool,
+    ) -> Result<S::TokenStream, PanicMessage>
+    where
+        S: Server,
+        S::TokenStream: Default,
+    {
+        let client::WasmClient { get_handle_counters, run, macro_ref, _marker } = *self;
+        run_wasm_server(
+            strategy,
+            get_handle_counters(),
+            server,
+            <MarkedTypes<S> as Types>::TokenStream::mark(input),
+            run,
+            macro_ref,
             force_show_panics,
         )
         .map(|s| <Option<<MarkedTypes<S> as Types>::TokenStream>>::unmark(s).unwrap_or_default())

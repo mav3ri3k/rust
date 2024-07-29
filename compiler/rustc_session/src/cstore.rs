@@ -27,6 +27,7 @@ pub struct CrateSource {
     pub dylib: Option<(PathBuf, PathKind)>,
     pub rlib: Option<(PathBuf, PathKind)>,
     pub rmeta: Option<(PathBuf, PathKind)>,
+    pub wasm_proc_macro: Option<(PathBuf, PathKind)>,
 }
 
 impl CrateSource {

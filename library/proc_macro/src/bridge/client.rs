@@ -274,6 +274,60 @@ impl<I, O> Clone for Client<I, O> {
     }
 }
 
+#[repr(C)]
+pub struct WasmClient<I, O> {
+    // FIXME(eddyb) use a reference to the `static COUNTERS`, instead of
+    // a wrapper `fn` pointer, once `const fn` can reference `static`s.
+    pub(super) get_handle_counters: extern "C" fn() -> &'static HandleCounters,
+
+    pub(super) run: extern "C" fn(BridgeConfig<'_>, WasmProcMacroRef) -> Buffer,
+
+    pub(super) macro_ref: WasmProcMacroRef,
+
+    pub(super) _marker: PhantomData<fn(I) -> O>,
+}
+
+/// An ID allocated by the wasm-proc-macro loader at runtime.
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct WasmProcMacroRef {
+    runtime: WasmRuntimeRef,
+    macro_id: u32,
+}
+
+impl<I, O> Copy for WasmClient<I, O> {}
+impl<I, O> Clone for WasmClient<I, O> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl WasmProcMacroRef {
+    /// # Safety
+    /// `run_fn` must be from the same dynamic library as created `runtime`. This can be satisfied
+    /// by calling this function from the shared library itself.
+    pub unsafe fn new(
+        runtime: WasmRuntimeRef,
+        macro_id: u32,
+    ) -> Self {
+        Self { runtime, macro_id }
+    }
+
+    pub(super) fn invoke(self, bridge_config: BridgeConfig<'_>,
+    run_client: extern "C" fn(BridgeConfig<'_>, WasmProcMacroRef) -> Buffer,
+) -> Buffer {
+        run_client(bridge_config, self)
+    }
+
+    pub fn runtime(&self) -> WasmRuntimeRef {
+        self.runtime
+    }
+
+    pub fn macro_id(&self) -> u32 {
+        self.macro_id
+    }
+}
+
 fn maybe_install_panic_hook(force_show_panics: bool) {
     // Hide the default panic output within `proc_macro` expansions.
     // NB. the server can't do this because it may use a different std.
@@ -342,6 +396,54 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
     buf
 }
 
+fn run_wasm_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
+    config: BridgeConfig<'_>,
+    wasm_macro_ref: WasmProcMacroRef,
+    f: impl FnOnce(WasmProcMacroRef, A) -> R,
+) -> Buffer {
+    let BridgeConfig { input: mut buf, dispatch, force_show_panics, .. } = config;
+
+    panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        maybe_install_panic_hook(force_show_panics);
+
+        // Make sure the symbol store is empty before decoding inputs.
+        Symbol::invalidate_all();
+
+        let reader = &mut &buf[..];
+        let (globals, input) = <(ExpnGlobals<Span>, A)>::decode(reader, &mut ());
+
+        // Put the buffer we used for input back in the `Bridge` for requests.
+        let state = RefCell::new(Bridge { cached_buffer: buf.take(), dispatch, globals });
+
+        let output = state::set(&state, || f(wasm_macro_ref, input));
+
+        // Take the `cached_buffer` back out, for the output value.
+        buf = RefCell::into_inner(state).cached_buffer;
+
+        // HACK(eddyb) Separate encoding a success value (`Ok(output)`)
+        // from encoding a panic (`Err(e: PanicMessage)`) to avoid
+        // having handles outside the `bridge.enter(|| ...)` scope, and
+        // to catch panics that could happen while encoding the success.
+        //
+        // Note that panics should be impossible beyond this point, but
+        // this is defensively trying to avoid any accidental panicking
+        // reaching the `extern "C"` (which should `abort` but might not
+        // at the moment, so this is also potentially preventing UB).
+        buf.clear();
+        Ok::<_, ()>(output).encode(&mut buf, &mut ());
+    }))
+    .map_err(PanicMessage::from)
+    .unwrap_or_else(|e| {
+        buf.clear();
+        Err::<(), _>(e).encode(&mut buf, &mut ());
+    });
+
+    // Now that a response has been serialized, invalidate all symbols
+    // registered with the interner.
+    Symbol::invalidate_all();
+    buf
+}
+
 impl Client<crate::TokenStream, crate::TokenStream> {
     pub const fn expand1(f: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy) -> Self {
         Client {
@@ -370,6 +472,20 @@ impl Client<(crate::TokenStream, crate::TokenStream), crate::TokenStream> {
     }
 }
 
+impl WasmClient<crate::TokenStream, crate::TokenStream> {
+    pub const fn expand1(macro_ref: WasmProcMacroRef,
+            f: impl Fn(WasmProcMacroRef, crate::TokenStream) -> crate::TokenStream + Copy,
+        ) -> Self {
+        WasmClient { get_handle_counters: HandleCounters::get,
+            run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge_wasm(move |bridge, macro_ref| {
+                run_wasm_client(bridge, macro_ref,|macro_ref, input| {
+                    f(macro_ref, crate::TokenStream(Some(input))).0
+                })
+            }),
+            macro_ref, _marker: PhantomData }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub enum ProcMacro {
@@ -388,6 +504,11 @@ pub enum ProcMacro {
         name: &'static str,
         client: Client<crate::TokenStream, crate::TokenStream>,
     },
+
+    WasmBang {
+        name: &'static str,
+        client: WasmClient<crate::TokenStream, crate::TokenStream>,
+    },
 }
 
 impl ProcMacro {
@@ -396,6 +517,7 @@ impl ProcMacro {
             ProcMacro::CustomDerive { trait_name, .. } => trait_name,
             ProcMacro::Attr { name, .. } => name,
             ProcMacro::Bang { name, .. } => name,
+            ProcMacro::WasmBang { name, .. } => name,
         }
     }
 
@@ -419,5 +541,9 @@ impl ProcMacro {
         expand: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy,
     ) -> Self {
         ProcMacro::Bang { name, client: Client::expand1(expand) }
+    }
+
+    pub const fn wasm_bang(name: &'static str, macro_ref: WasmProcMacroRef, f: impl Fn(WasmProcMacroRef, crate::TokenStream) -> crate::TokenStream + Copy) -> Self {
+        ProcMacro::WasmBang { name, client: WasmClient::expand1(macro_ref, f) }
     }
 }

@@ -278,6 +278,7 @@ pub(crate) enum CrateFlavor {
     Rlib,
     Rmeta,
     Dylib,
+    WasmProcMacro,
 }
 
 impl fmt::Display for CrateFlavor {
@@ -286,6 +287,7 @@ impl fmt::Display for CrateFlavor {
             CrateFlavor::Rlib => "rlib",
             CrateFlavor::Rmeta => "rmeta",
             CrateFlavor::Dylib => "dylib",
+            CrateFlavor::WasmProcMacro => "wasm-proc-macro",
         })
     }
 }
@@ -296,6 +298,7 @@ impl IntoDiagArg for CrateFlavor {
             CrateFlavor::Rlib => DiagArgValue::Str(Cow::Borrowed("rlib")),
             CrateFlavor::Rmeta => DiagArgValue::Str(Cow::Borrowed("rmeta")),
             CrateFlavor::Dylib => DiagArgValue::Str(Cow::Borrowed("dylib")),
+            CrateFlavor::WasmProcMacro => DiagArgValue::Str(Cow::Borrowed("wasm-proc-macro")),
         }
     }
 }
@@ -385,8 +388,10 @@ impl<'a> CrateLocator<'a> {
         let dylib_suffix = &self.target.dll_suffix;
         let staticlib_suffix = &self.target.staticlib_suffix;
 
-        let mut candidates: FxHashMap<_, (FxHashMap<_, _>, FxHashMap<_, _>, FxHashMap<_, _>)> =
-            Default::default();
+        let mut candidates: FxHashMap<
+            _,
+            (FxHashMap<_, _>, FxHashMap<_, _>, FxHashMap<_, _>, FxHashMap<_, _>),
+        > = Default::default();
 
         // First, find all possible candidate rlibs and dylibs purely based on
         // the name of the files themselves. We're trying to match against an
@@ -438,7 +443,8 @@ impl<'a> CrateLocator<'a> {
 
                 info!("lib candidate: {}", spf.path.display());
 
-                let (rlibs, rmetas, dylibs) = candidates.entry(hash.to_string()).or_default();
+                let (rlibs, rmetas, dylibs, wasm_proc_macros) =
+                    candidates.entry(hash.to_string()).or_default();
                 let path = try_canonicalize(&spf.path).unwrap_or_else(|_| spf.path.clone());
                 if seen_paths.contains(&path) {
                     continue;
@@ -448,6 +454,7 @@ impl<'a> CrateLocator<'a> {
                     CrateFlavor::Rlib => rlibs.insert(path, search_path.kind),
                     CrateFlavor::Rmeta => rmetas.insert(path, search_path.kind),
                     CrateFlavor::Dylib => dylibs.insert(path, search_path.kind),
+                    CrateFlavor::WasmProcMacro => wasm_proc_macros.insert(path, search_path.kind),
                 };
             }
         }
@@ -461,8 +468,8 @@ impl<'a> CrateLocator<'a> {
         // libraries corresponds to the crate id and hash criteria that this
         // search is being performed for.
         let mut libraries = FxHashMap::default();
-        for (_hash, (rlibs, rmetas, dylibs)) in candidates {
-            if let Some((svh, lib)) = self.extract_lib(rlibs, rmetas, dylibs)? {
+        for (_hash, (rlibs, rmetas, dylibs, wasm_proc_macros)) in candidates {
+            if let Some((svh, lib)) = self.extract_lib(rlibs, rmetas, dylibs, wasm_proc_macros)? {
                 libraries.insert(svh, lib);
             }
         }
@@ -497,6 +504,7 @@ impl<'a> CrateLocator<'a> {
         rlibs: FxHashMap<PathBuf, PathKind>,
         rmetas: FxHashMap<PathBuf, PathKind>,
         dylibs: FxHashMap<PathBuf, PathKind>,
+        wasm_proc_macros: FxHashMap<PathBuf, PathKind>,
     ) -> Result<Option<(Svh, Library)>, CrateError> {
         let mut slot = None;
         // Order here matters, rmeta should come first. See comment in
@@ -505,6 +513,11 @@ impl<'a> CrateLocator<'a> {
             rmeta: self.extract_one(rmetas, CrateFlavor::Rmeta, &mut slot)?,
             rlib: self.extract_one(rlibs, CrateFlavor::Rlib, &mut slot)?,
             dylib: self.extract_one(dylibs, CrateFlavor::Dylib, &mut slot)?,
+            wasm_proc_macro: self.extract_one(
+                wasm_proc_macros,
+                CrateFlavor::WasmProcMacro,
+                &mut slot,
+            )?,
         };
         Ok(slot.map(|(svh, metadata, _)| (svh, Library { source, metadata })))
     }
@@ -705,6 +718,7 @@ impl<'a> CrateLocator<'a> {
         let mut rlibs = FxHashMap::default();
         let mut rmetas = FxHashMap::default();
         let mut dylibs = FxHashMap::default();
+        let mut wasm_proc_macros = FxHashMap::default();
         for loc in &self.exact_paths {
             if !loc.canonicalized().exists() {
                 return Err(CrateError::ExternLocationNotExist(
@@ -725,7 +739,8 @@ impl<'a> CrateLocator<'a> {
                 ));
             };
 
-            if file.starts_with("lib") && (file.ends_with(".rlib") || file.ends_with(".rmeta"))
+            if file.starts_with("lib")
+                && (file.ends_with(".rlib") || file.ends_with(".rmeta") || file.ends_with(".wpm"))
                 || file.starts_with(self.target.dll_prefix.as_ref())
                     && file.ends_with(self.target.dll_suffix.as_ref())
             {
@@ -742,6 +757,8 @@ impl<'a> CrateLocator<'a> {
                     rlibs.insert(loc_canon, PathKind::ExternFlag);
                 } else if loc.file_name().unwrap().to_str().unwrap().ends_with(".rmeta") {
                     rmetas.insert(loc_canon, PathKind::ExternFlag);
+                } else if loc.file_name().unwrap().to_str().unwrap().ends_with(".wpm") {
+                    wasm_proc_macros.insert(loc_canon, PathKind::ExternFlag);
                 } else {
                     dylibs.insert(loc_canon, PathKind::ExternFlag);
                 }
@@ -753,7 +770,7 @@ impl<'a> CrateLocator<'a> {
         }
 
         // Extract the dylib/rlib/rmeta triple.
-        Ok(self.extract_lib(rlibs, rmetas, dylibs)?.map(|(_, lib)| lib))
+        Ok(self.extract_lib(rlibs, rmetas, dylibs, wasm_proc_macros)?.map(|(_, lib)| lib))
     }
 
     pub(crate) fn into_error(self, root: Option<CratePaths>) -> CrateError {
@@ -782,9 +799,15 @@ fn get_metadata_section<'p>(
         CrateFlavor::Rlib => {
             loader.get_rlib_metadata(target, filename).map_err(MetadataError::LoadFailure)?
         }
-        CrateFlavor::Dylib => {
-            let buf =
-                loader.get_dylib_metadata(target, filename).map_err(MetadataError::LoadFailure)?;
+        CrateFlavor::Dylib | CrateFlavor::WasmProcMacro => {
+            let buf = if matches!(flavor, CrateFlavor::WasmProcMacro) {
+                // For now, we assume that there's a .so version of the proc-macro alongside the
+                // .wpm. We load the metadata from that. Eventually, we should either store the
+                // metadata in the wasm file, or in a separate .rmeta file that lives alongside it.
+                loader.get_dylib_metadata(target, &filename.with_extension("so")).map_err(MetadataError::LoadFailure)?
+            } else {
+                loader.get_dylib_metadata(target, filename).map_err(MetadataError::LoadFailure)?
+            };
             // The header is uncompressed
             let header_len = METADATA_HEADER.len();
             // header + u64 length of data

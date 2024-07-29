@@ -37,6 +37,7 @@ use std::path::Path;
 use std::{io, iter, mem};
 
 pub(super) use cstore_impl::provide;
+use rustc_expand::proc_macro::WasmBangProcMacro;
 use rustc_span::hygiene::HygieneDecodeContext;
 
 mod cstore_impl;
@@ -1054,6 +1055,11 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
             ProcMacro::Bang { name, client } => {
                 (name, SyntaxExtensionKind::Bang(Box::new(BangProcMacro { client })), Vec::new())
             }
+            ProcMacro::WasmBang { name, client } => (
+                name,
+                SyntaxExtensionKind::Bang(Box::new(WasmBangProcMacro { client })),
+                Vec::new(),
+            ),
         };
 
         let sess = tcx.sess;

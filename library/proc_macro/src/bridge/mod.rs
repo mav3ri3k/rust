@@ -6,8 +6,6 @@
 //! (from the same source) by different compilers with potentially mismatching
 //! Rust ABIs (e.g., stage0/bin/rustc vs stage1/bin/rustc during bootstrap).
 
-#![deny(unsafe_code)]
-
 use crate::{Delimiter, Level, Spacing};
 use std::fmt;
 use std::hash::Hash;
@@ -154,7 +152,7 @@ macro_rules! reverse_decode {
 mod arena;
 #[allow(unsafe_code)]
 mod buffer;
-#[deny(unsafe_code)]
+#[allow(unsafe_code)]
 pub mod client;
 #[allow(unsafe_code)]
 mod closure;
@@ -167,7 +165,7 @@ mod handle;
 mod rpc;
 #[allow(unsafe_code)]
 mod selfless_reify;
-#[forbid(unsafe_code)]
+#[allow(unsafe_code)]
 pub mod server;
 #[allow(unsafe_code)]
 mod symbol;
@@ -196,6 +194,24 @@ pub struct BridgeConfig<'a> {
     // this, but that requires unstable features. rust-analyzer uses this code
     // and avoids unstable features.
     _marker: marker::PhantomData<*mut ()>,
+}
+
+/// A handle to the wasm proc-macro runtime.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct WasmRuntimeRef {
+    /// An opaque handle provided by the wasm shared object that identifies the runtime in use.
+    raw: usize,
+}
+
+impl WasmRuntimeRef {
+    pub unsafe fn new(raw: usize) -> Self {
+        Self { raw }
+    }
+
+    pub fn handle(self) -> usize {
+        self.raw
+    }
 }
 
 #[forbid(unsafe_code)]

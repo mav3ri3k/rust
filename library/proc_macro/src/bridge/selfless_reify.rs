@@ -37,6 +37,7 @@
 //! ```
 
 use std::mem;
+use super::client::WasmProcMacroRef;
 
 // FIXME(eddyb) this could be `trait` impls except for the `const fn` requirement.
 macro_rules! define_reify_functions {
@@ -81,4 +82,5 @@ define_reify_functions! {
     // `for<'a>` binder).
     // FIXME(eddyb) try to remove the lifetime from `BridgeConfig`, that'd help.
     fn reify_to_extern_c_fn_hrt_bridge<R> for extern "C" fn(bridge: super::BridgeConfig<'_>) -> R;
+    fn reify_to_extern_c_fn_hrt_bridge_wasm<R> for extern "C" fn(bridge: super::BridgeConfig<'_>, macro_ref: WasmProcMacroRef) -> R;
 }

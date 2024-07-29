@@ -1,0 +1,12 @@
+[package]
+name = "wasm-proc-macro-loader"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1.0.86"
+wasi-common = "23.0.1"
+wasmtime = "23.0.1"

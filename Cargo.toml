@@ -63,6 +63,9 @@ exclude = [
   "src/tools/x",
   # stdarch has its own Cargo workspace
   "library/stdarch",
+  "wasm-proc-macro-loader",
+  "wasm-proc-macro",
+  "pmacro1",
 ]
 
 [profile.release.package.compiler_builtins]

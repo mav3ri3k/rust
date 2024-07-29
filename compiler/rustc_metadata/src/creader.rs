@@ -31,8 +31,11 @@ use tracing::{debug, info, trace};
 
 use proc_macro::bridge::client::ProcMacro;
 use std::error::Error;
+use std::ffi::c_void;
+use std::mem::ManuallyDrop;
 use std::ops::Fn;
 use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 use std::{cmp, env, iter};
@@ -80,6 +83,43 @@ pub struct CrateLoader<'a, 'tcx: 'a> {
     // Mutable output.
     cstore: &'a mut CStore,
     used_extern_options: &'a mut FxHashSet<Symbol>,
+    wasm_proc_macro_loader: Option<WasmProcMacroLoader>,
+}
+
+type WasmLoaderFn = extern "C" fn(
+    runtime: *mut c_void,
+    wasm_path: *const u8,
+    path_length: usize,
+) -> *const &'static [ProcMacro];
+
+struct WasmProcMacroLoader {
+    runtime: *mut c_void,
+    loader_fn: WasmLoaderFn,
+}
+
+impl WasmProcMacroLoader {
+    fn new(tcx: TyCtxt<'_>) -> Result<Self, CrateError> {
+        // TODO: Won't be .so on other platforms.
+        let wasm_loader_path = if let Ok(loader) = std::env::var("RUSTC_WASM_PROC_MACRO_LOADER") {
+            PathBuf::from(loader)
+        } else {
+            tcx.sess.sysroot.join("libwasm-proc-macro-loader.so")
+        };
+
+        let lib = DynamicLibrary::open(&wasm_loader_path)?;
+
+        let init_fn = unsafe { lib.get::<extern "C" fn() -> *mut c_void>("create_runtime") }?;
+        let runtime = init_fn();
+
+        Ok(Self { runtime, loader_fn: unsafe { lib.get("load_wasm_proc_macro") }? })
+    }
+
+    fn load_wasm(&mut self, path: &Path) -> Result<&'static [ProcMacro], CrateError> {
+        // TODO: Come up with mechanism for getting errors back from the loader.
+        let path_bytes = path.as_os_str().as_encoded_bytes();
+        let proc_macros = (self.loader_fn)(self.runtime, path_bytes.as_ptr(), path_bytes.len());
+        Ok(unsafe { *proc_macros })
+    }
 }
 
 impl<'a, 'tcx> std::ops::Deref for CrateLoader<'a, 'tcx> {
@@ -136,7 +176,7 @@ impl<'a> std::fmt::Debug for CrateDump<'a> {
             writeln!(fmt, "  cnum: {cnum}")?;
             writeln!(fmt, "  hash: {}", data.hash())?;
             writeln!(fmt, "  reqd: {:?}", data.dep_kind())?;
-            let CrateSource { dylib, rlib, rmeta } = data.source();
+            let CrateSource { dylib, rlib, rmeta, wasm_proc_macro } = data.source();
             if let Some(dylib) = dylib {
                 writeln!(fmt, "  dylib: {}", dylib.0.display())?;
             }
@@ -145,6 +185,9 @@ impl<'a> std::fmt::Debug for CrateDump<'a> {
             }
             if let Some(rmeta) = rmeta {
                 writeln!(fmt, "   rmeta: {}", rmeta.0.display())?;
+            }
+            if let Some(wasm_proc_macro) = wasm_proc_macro {
+                writeln!(fmt, "   wasm-proc-macro: {}", wasm_proc_macro.0.display())?;
             }
         }
         Ok(())
@@ -314,7 +357,7 @@ impl<'a, 'tcx> CrateLoader<'a, 'tcx> {
         cstore: &'a mut CStore,
         used_extern_options: &'a mut FxHashSet<Symbol>,
     ) -> Self {
-        CrateLoader { tcx, cstore, used_extern_options }
+        CrateLoader { tcx, cstore, used_extern_options, wasm_proc_macro_loader: None }
     }
 
     fn existing_match(&self, name: Symbol, hash: Option<Svh>, kind: PathKind) -> Option<CrateNum> {
@@ -442,8 +485,16 @@ impl<'a, 'tcx> CrateLoader<'a, 'tcx> {
                 }),
                 None => (&source, &crate_root),
             };
-            let dlsym_dylib = dlsym_source.dylib.as_ref().expect("no dylib for a proc-macro crate");
-            Some(self.dlsym_proc_macros(&dlsym_dylib.0, dlsym_root.stable_crate_id())?)
+            if let Some(&(ref wasm_path, _)) = dlsym_source.wasm_proc_macro.as_ref() {
+                if self.wasm_proc_macro_loader.is_none() {
+                    self.wasm_proc_macro_loader = Some(WasmProcMacroLoader::new(self.tcx)?);
+                }
+                Some(self.wasm_proc_macro_loader.as_mut().unwrap().load_wasm(wasm_path)?)
+            } else {
+                let dlsym_dylib =
+                    dlsym_source.dylib.as_ref().expect("no dylib for a proc-macro crate");
+                Some(self.dlsym_proc_macros(&dlsym_dylib.0, dlsym_root.stable_crate_id())?)
+            }
         } else {
             None
         };
@@ -1214,22 +1265,43 @@ impl From<DylibError> for CrateError {
     }
 }
 
+struct DynamicLibrary {
+    // Once we've loaded a library, it must always be leaked. We can't ever unload it since the
+    // library can make things that will live arbitrarily long.
+    lib: ManuallyDrop<libloading::Library>,
+    path: PathBuf,
+}
+
+impl DynamicLibrary {
+    fn open(path: &Path) -> Result<Self, DylibError> {
+        // Make sure the path contains a / or the linker will search for it.
+        let path = try_canonicalize(path).unwrap();
+
+        let lib = load_dylib(&path, 5)
+            .map_err(|err| DylibError::DlOpen(path.display().to_string(), err))?;
+
+        // Intentionally leak the dynamic library. We can't ever unload it
+        // since the library can make things that will live arbitrarily long.
+        let lib = ManuallyDrop::new(lib);
+
+        Ok(Self { lib, path })
+    }
+
+    unsafe fn get<T: Copy>(&self, sym_name: &str) -> Result<T, DylibError> {
+        let sym = unsafe { self.lib.get::<T>(sym_name.as_bytes()) }.map_err(|err| {
+            DylibError::DlSym(self.path.display().to_string(), format_dlopen_err(&err))
+        })?;
+
+        let sym = unsafe { sym.into_raw() };
+
+        Ok(*sym)
+    }
+}
+
 pub unsafe fn load_symbol_from_dylib<T: Copy>(
     path: &Path,
     sym_name: &str,
 ) -> Result<T, DylibError> {
-    // Make sure the path contains a / or the linker will search for it.
-    let path = try_canonicalize(path).unwrap();
-    let lib =
-        load_dylib(&path, 5).map_err(|err| DylibError::DlOpen(path.display().to_string(), err))?;
-
-    let sym = unsafe { lib.get::<T>(sym_name.as_bytes()) }
-        .map_err(|err| DylibError::DlSym(path.display().to_string(), format_dlopen_err(&err)))?;
-
-    // Intentionally leak the dynamic library. We can't ever unload it
-    // since the library can make things that will live arbitrarily long.
-    let sym = unsafe { sym.into_raw() };
-    std::mem::forget(lib);
-
-    Ok(*sym)
+    let lib = DynamicLibrary::open(path)?;
+    unsafe { lib.get(sym_name) }
 }

@@ -112,6 +112,9 @@ impl ProcMacros {
                 bridge::client::ProcMacro::Bang { name, .. } => {
                     (name.to_string(), ProcMacroKind::Bang)
                 }
+                bridge::client::ProcMacro::WasmBang { name, .. } => {
+                    (name.to_string(), ProcMacroKind::Bang)
+                }
                 bridge::client::ProcMacro::Attr { name, .. } => {
                     (name.to_string(), ProcMacroKind::Attr)
                 }
