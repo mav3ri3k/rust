@@ -1,0 +1,210 @@
+thread 'rustc' panicked at compiler/rustc_metadata/src/locator.rs:596:17:
+This should not happend
+stack backtrace:
+   0:     0xffac89256778 - trace
+                               at /home/gh-mav3ri3k/rust/library/std/src/../../backtrace/src/backtrace/libunwind.rs:116:5
+   1:     0xffac89256778 - trace_unsynchronized<std::backtrace::{impl#4}::create::{closure_env#0}>
+                               at /home/gh-mav3ri3k/rust/library/std/src/../../backtrace/src/backtrace/mod.rs:66:5
+   2:     0xffac89256778 - create
+                               at /home/gh-mav3ri3k/rust/library/std/src/backtrace.rs:331:13
+   3:     0xffac8a0f04b0 - {closure#0}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_driver_impl/src/lib.rs:1408:25
+   4:     0xffac8a0f04b0 - call<(&(dyn core::ops::function::Fn<(&core::panic::panic_info::PanicInfo), Output=()> + core::marker::Send + core::marker::Sync), &core::panic::panic_info::PanicInfo), rustc_driver_impl::install_ice_hook::{closure_env#0}, alloc::alloc::Global>
+                               at /home/gh-mav3ri3k/rust/library/alloc/src/boxed.rs:2077:9
+   5:     0xffac89249158 - rust_panic_with_hook
+                               at /home/gh-mav3ri3k/rust/library/std/src/panicking.rs:799:13
+   6:     0xffac8925d7d8 - {closure#0}
+                               at /home/gh-mav3ri3k/rust/library/std/src/panicking.rs:656:13
+   7:     0xffac8925d750 - std::sys_common::backtrace::__rust_end_short_backtrace::hbebd68b4ede11454
+                               at /home/gh-mav3ri3k/rust/library/std/src/sys_common/backtrace.rs:171:18
+   8:     0xffac89248db8 - begin_panic_handler
+                               at /home/gh-mav3ri3k/rust/library/std/src/panicking.rs:652:5
+   9:     0xffac8922915c - panic_fmt
+                               at /home/gh-mav3ri3k/rust/library/core/src/panicking.rs:72:14
+  10:     0xffac8ee1a22c - extract_one
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_metadata/src/locator.rs:596:17
+  11:     0xffac8ee188bc - extract_lib
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_metadata/src/locator.rs:549:19
+  12:     0xffac8ee16e2c - find_commandline_library
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_metadata/src/locator.rs:876:12
+  13:     0xffac8ee16e2c - maybe_load_library_crate
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_metadata/src/locator.rs:376:20
+  14:     0xffac8edf5488 - load
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_metadata/src/creader.rs:693:29
+  15:     0xffac8edf3114 - maybe_resolve_crate
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_metadata/src/creader.rs:654:19
+  16:     0xffac8edf7048 - maybe_process_path_extern
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_metadata/src/creader.rs:1201:9
+  17:     0xffac8dea6ed0 - {closure#2}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/lib.rs:2063:43
+  18:     0xffac8dea6ed0 - crate_loader<core::option::Option<rustc_span::def_id::CrateNum>, rustc_resolve::{impl#21}::extern_prelude_get::{closure#0}::{closure_env#2}>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/lib.rs:1629:9
+  19:     0xffac8dda67fc - {closure#0}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/lib.rs:2063:21
+  20:     0xffac8dda67fc - and_then<rustc_resolve::ExternPreludeEntry, rustc_data_structures::intern::Interned<rustc_resolve::NameBindingData>, rustc_resolve::{impl#21}::extern_prelude_get::{closure_env#0}>
+                               at /home/gh-mav3ri3k/rust/library/core/src/option.rs:1415:24
+  21:     0xffac8dda67fc - extern_prelude_get
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/lib.rs:2044:23
+  22:     0xffac8dea385c - {closure#0}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/ident.rs:569:31
+  23:     0xffac8dea385c - visit_scopes<core::result::Result<rustc_data_structures::intern::Interned<rustc_resolve::NameBindingData>, rustc_resolve::Determinacy>, rustc_resolve::ident::{impl#1}::early_resolve_ident_in_lexical_scope::{closure_env#0}>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/ident.rs:148:50
+  24:     0xffac8dda917c - early_resolve_ident_in_lexical_scope
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/ident.rs:429:28
+  25:     0xffac8dd94d8c - resolve_path_with_ribs
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/ident.rs:1516:17
+  26:     0xffac8ddab430 - maybe_resolve_path
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/ident.rs:1366:9
+  27:     0xffac8dd9b8f0 - resolve_import
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/imports.rs:783:28
+  28:     0xffac8dd9b8f0 - resolve_imports
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/imports.rs:519:50
+  29:     0xffac8dd9b8f0 - resolve_imports
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_resolve/src/macros.rs:240:9
+  30:     0xffac8ef1f728 - resolve_imports
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_expand/src/expand.rs:560:13
+  31:     0xffac8ef1f728 - fully_expand_fragment
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_expand/src/expand.rs:426:9
+  32:     0xffac8ef1f3e4 - expand_crate
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_expand/src/expand.rs:409:21
+  33:     0xffac8a2c27d0 - {closure#2}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_interface/src/passes.rs:205:50
+  34:     0xffac8a2c27d0 - run<rustc_ast::ast::Crate, rustc_interface::passes::configure_and_expand::{closure#1}::{closure_env#2}>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_data_structures/src/profiling.rs:754:9
+  35:     0xffac8a2c27d0 - time<rustc_ast::ast::Crate, rustc_interface::passes::configure_and_expand::{closure#1}::{closure_env#2}>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_session/src/utils.rs:16:9
+  36:     0xffac8a2c27d0 - {closure#1}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_interface/src/passes.rs:205:21
+  37:     0xffac8a2c27d0 - run<rustc_ast::ast::Crate, rustc_interface::passes::configure_and_expand::{closure_env#1}>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_data_structures/src/profiling.rs:754:9
+  38:     0xffac8a2c27d0 - time<rustc_ast::ast::Crate, rustc_interface::passes::configure_and_expand::{closure_env#1}>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_session/src/utils.rs:16:9
+  39:     0xffac8a2cd0ac - configure_and_expand
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_interface/src/passes.rs:155:13
+  40:     0xffac8a2cd0ac - resolver_for_lowering_raw
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_interface/src/passes.rs:543:17
+  41:     0xffac8e41c8c4 - {closure#0}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_impl/src/lib.rs:222:1
+  42:     0xffac8e41c8c4 - __rust_begin_short_backtrace<rustc_query_impl::query_impl::resolver_for_lowering_raw::dynamic_query::{closure#2}::{closure_env#0}, rustc_middle::query::erase::Erased<[u8; 16]>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_impl/src/plumbing.rs:546:18
+  43:     0xffac8e39043c - {closure#2}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_impl/src/plumbing.rs:618:25
+  44:     0xffac8e39043c - call_once<rustc_query_impl::query_impl::resolver_for_lowering_raw::dynamic_query::{closure_env#2}, (rustc_middle::ty::context::TyCtxt, ())>
+                               at /home/gh-mav3ri3k/rust/library/core/src/ops/function.rs:250:5
+  45:     0xffac8e1a006c - compute<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_impl/src/lib.rs:108:9
+  46:     0xffac8e1a006c - {closure#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_system/src/query/plumbing.rs:470:72
+  47:     0xffac8e1a006c - {closure#0}<rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>, rustc_middle::query::erase::Erased<[u8; 16]>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context/tls.rs:82:9
+  48:     0xffac8e1a006c - try_with<core::cell::Cell<*const ()>, rustc_middle::ty::context::tls::enter_context::{closure_env#0}<rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>, rustc_middle::query::erase::Erased<[u8; 16]>>, rustc_middle::query::erase::Erased<[u8; 16]>>
+                               at /home/gh-mav3ri3k/rust/library/std/src/thread/local.rs:286:12
+  49:     0xffac8e1a006c - with<core::cell::Cell<*const ()>, rustc_middle::ty::context::tls::enter_context::{closure_env#0}<rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>, rustc_middle::query::erase::Erased<[u8; 16]>>, rustc_middle::query::erase::Erased<[u8; 16]>>
+                               at /home/gh-mav3ri3k/rust/library/std/src/thread/local.rs:262:9
+  50:     0xffac8e2e0a98 - enter_context<rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>, rustc_middle::query::erase::Erased<[u8; 16]>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context/tls.rs:79:5
+  51:     0xffac8e2e0a98 - {closure#0}<rustc_middle::query::erase::Erased<[u8; 16]>, rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_impl/src/plumbing.rs:149:13
+  52:     0xffac8e2e0a98 - {closure#0}<rustc_query_impl::plumbing::{impl#3}::start_query::{closure_env#0}<rustc_middle::query::erase::Erased<[u8; 16]>, rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>>, rustc_middle::query::erase::Erased<[u8; 16]>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context/tls.rs:134:9
+  53:     0xffac8e2e0a98 - {closure#0}<rustc_middle::ty::context::tls::with_related_context::{closure_env#0}<rustc_query_impl::plumbing::{impl#3}::start_query::{closure_env#0}<rustc_middle::query::erase::Erased<[u8; 16]>, rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>>, rustc_middle::query::erase::Erased<[u8; 16]>>, rustc_middle::query::erase::Erased<[u8; 16]>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context/tls.rs:112:36
+  54:     0xffac8e2e0a98 - with_context_opt<rustc_middle::ty::context::tls::with_context::{closure_env#0}<rustc_middle::ty::context::tls::with_related_context::{closure_env#0}<rustc_query_impl::plumbing::{impl#3}::start_query::{closure_env#0}<rustc_middle::query::erase::Erased<[u8; 16]>, rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>>, rustc_middle::query::erase::Erased<[u8; 16]>>, rustc_middle::query::erase::Erased<[u8; 16]>>, rustc_middle::query::erase::Erased<[u8; 16]>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context/tls.rs:101:18
+  55:     0xffac8e2e0a98 - with_context<rustc_middle::ty::context::tls::with_related_context::{closure_env#0}<rustc_query_impl::plumbing::{impl#3}::start_query::{closure_env#0}<rustc_middle::query::erase::Erased<[u8; 16]>, rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>>, rustc_middle::query::erase::Erased<[u8; 16]>>, rustc_middle::query::erase::Erased<[u8; 16]>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context/tls.rs:112:5
+  56:     0xffac8e2e0a98 - with_related_context<rustc_query_impl::plumbing::{impl#3}::start_query::{closure_env#0}<rustc_middle::query::erase::Erased<[u8; 16]>, rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>>, rustc_middle::query::erase::Erased<[u8; 16]>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context/tls.rs:125:5
+  57:     0xffac8e2e0a98 - start_query<rustc_middle::query::erase::Erased<[u8; 16]>, rustc_query_system::query::plumbing::execute_job_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_impl/src/plumbing.rs:134:9
+  58:     0xffac8e2e0a98 - execute_job_non_incr<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_system/src/query/plumbing.rs:470:18
+  59:     0xffac8e2e0a98 - execute_job<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt, false>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_system/src/query/plumbing.rs:406:9
+  60:     0xffac8e2e0a98 - try_execute_query<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt, false>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_system/src/query/plumbing.rs:349:13
+  61:     0xffac8e390698 - {closure#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_system/src/query/plumbing.rs:801:32
+  62:     0xffac8e390698 - maybe_grow<rustc_middle::query::erase::Erased<[u8; 16]>, rustc_query_system::query::plumbing::get_query_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>>
+                               at /home/gh-mav3ri3k/.cargo/registry/src/index.crates.io-6f17d22bba15001f/stacker-0.1.15/src/lib.rs:55:9
+  63:     0xffac8e390698 - ensure_sufficient_stack<rustc_middle::query::erase::Erased<[u8; 16]>, rustc_query_system::query::plumbing::get_query_non_incr::{closure_env#0}<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_data_structures/src/stack.rs:17:5
+  64:     0xffac8e390698 - get_query_non_incr<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_system/src/query/plumbing.rs:801:5
+  65:     0xffac8e390698 - __rust_end_short_backtrace
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_query_impl/src/plumbing.rs:596:26
+  66:     0xffac8f1a9f60 - query_get_at<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/query/plumbing.rs:145:17
+  67:     0xffac8f1a9f60 - resolver_for_lowering_raw
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/query/plumbing.rs:423:31
+  68:     0xffac8f1a9f60 - resolver_for_lowering_raw
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/query/plumbing.rs:414:17
+  69:     0xffac8f1a9f60 - resolver_for_lowering
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context.rs:2744:9
+  70:     0xffac8a156eb0 - {closure#2}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_driver_impl/src/lib.rs:421:48
+  71:     0xffac8a156eb0 - {closure#1}<rustc_driver_impl::run_compiler::{closure#0}::{closure#1}::{closure_env#2}, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context.rs:882:37
+  72:     0xffac8a156eb0 - {closure#0}<rustc_middle::ty::context::{impl#17}::enter::{closure_env#1}<rustc_driver_impl::run_compiler::{closure#0}::{closure#1}::{closure_env#2}, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context/tls.rs:82:9
+  73:     0xffac8a156eb0 - try_with<core::cell::Cell<*const ()>, rustc_middle::ty::context::tls::enter_context::{closure_env#0}<rustc_middle::ty::context::{impl#17}::enter::{closure_env#1}<rustc_driver_impl::run_compiler::{closure#0}::{closure#1}::{closure_env#2}, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>
+                               at /home/gh-mav3ri3k/rust/library/std/src/thread/local.rs:286:12
+  74:     0xffac8a156eb0 - with<core::cell::Cell<*const ()>, rustc_middle::ty::context::tls::enter_context::{closure_env#0}<rustc_middle::ty::context::{impl#17}::enter::{closure_env#1}<rustc_driver_impl::run_compiler::{closure#0}::{closure#1}::{closure_env#2}, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>
+                               at /home/gh-mav3ri3k/rust/library/std/src/thread/local.rs:262:9
+  75:     0xffac8a16f4f0 - enter_context<rustc_middle::ty::context::{impl#17}::enter::{closure_env#1}<rustc_driver_impl::run_compiler::{closure#0}::{closure#1}::{closure_env#2}, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context/tls.rs:79:5
+  76:     0xffac8a16f4f0 - enter<rustc_driver_impl::run_compiler::{closure#0}::{closure#1}::{closure_env#2}, &rustc_data_structures::steal::Steal<(rustc_middle::ty::ResolverAstLowering, alloc::sync::Arc<rustc_ast::ast::Crate, alloc::alloc::Global>)>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_middle/src/ty/context.rs:882:9
+  77:     0xffac8a1498e8 - {closure#1}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_driver_impl/src/lib.rs:421:13
+  78:     0xffac8a1498e8 - enter<rustc_driver_impl::run_compiler::{closure#0}::{closure_env#1}, core::result::Result<core::option::Option<rustc_interface::queries::Linker>, rustc_span::ErrorGuaranteed>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_interface/src/queries.rs:315:19
+  79:     0xffac8a160afc - {closure#0}
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_driver_impl/src/lib.rs:387:22
+  80:     0xffac8a160afc - {closure#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_interface/src/interface.rs:503:27
+  81:     0xffac8a160afc - {closure#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_interface/src/util.rs:154:13
+  82:     0xffac8a160afc - {closure#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_interface/src/util.rs:106:21
+  83:     0xffac8a160afc - set<rustc_span::SessionGlobals, rustc_interface::util::run_in_thread_with_globals::{closure#0}::{closure#0}::{closure_env#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>
+                               at /home/gh-mav3ri3k/.cargo/registry/src/index.crates.io-6f17d22bba15001f/scoped-tls-1.0.1/src/lib.rs:137:9
+  84:     0xffac8a14d2a0 - create_session_globals_then<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_interface::util::run_in_thread_with_globals::{closure#0}::{closure#0}::{closure_env#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_span/src/lib.rs:134:5
+  85:     0xffac8a155018 - {closure#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>
+                               at /home/gh-mav3ri3k/rust/compiler/rustc_interface/src/util.rs:105:17
+  86:     0xffac8a155018 - __rust_begin_short_backtrace<rustc_interface::util::run_in_thread_with_globals::{closure#0}::{closure_env#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>
+                               at /home/gh-mav3ri3k/rust/library/std/src/sys_common/backtrace.rs:155:18
+  87:     0xffac8a0cfeb0 - {closure#0}<rustc_interface::util::run_in_thread_with_globals::{closure#0}::{closure_env#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>
+                               at /home/gh-mav3ri3k/rust/library/std/src/thread/mod.rs:542:17
+  88:     0xffac8a0cfeb0 - call_once<core::result::Result<(), rustc_span::ErrorGuaranteed>, std::thread::{impl#0}::spawn_unchecked_::{closure#2}::{closure_env#0}<rustc_interface::util::run_in_thread_with_globals::{closure#0}::{closure_env#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>>
+                               at /home/gh-mav3ri3k/rust/library/core/src/panic/unwind_safe.rs:272:9
+  89:     0xffac8a0cfeb0 - do_call<core::panic::unwind_safe::AssertUnwindSafe<std::thread::{impl#0}::spawn_unchecked_::{closure#2}::{closure_env#0}<rustc_interface::util::run_in_thread_with_globals::{closure#0}::{closure_env#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>
+                               at /home/gh-mav3ri3k/rust/library/std/src/panicking.rs:559:40
+  90:     0xffac8a0cfeb0 - try<core::result::Result<(), rustc_span::ErrorGuaranteed>, core::panic::unwind_safe::AssertUnwindSafe<std::thread::{impl#0}::spawn_unchecked_::{closure#2}::{closure_env#0}<rustc_interface::util::run_in_thread_with_globals::{closure#0}::{closure_env#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>>>
+                               at /home/gh-mav3ri3k/rust/library/std/src/panicking.rs:523:19
+  91:     0xffac8a15b124 - catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<std::thread::{impl#0}::spawn_unchecked_::{closure#2}::{closure_env#0}<rustc_interface::util::run_in_thread_with_globals::{closure#0}::{closure_env#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>
+                               at /home/gh-mav3ri3k/rust/library/std/src/panic.rs:149:14
+  92:     0xffac8a15b124 - {closure#2}<rustc_interface::util::run_in_thread_with_globals::{closure#0}::{closure_env#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>
+                               at /home/gh-mav3ri3k/rust/library/std/src/thread/mod.rs:541:30
+  93:     0xffac8a15b124 - call_once<std::thread::{impl#0}::spawn_unchecked_::{closure_env#2}<rustc_interface::util::run_in_thread_with_globals::{closure#0}::{closure_env#0}<rustc_interface::util::run_in_thread_pool_with_globals::{closure_env#0}<rustc_interface::interface::run_compiler::{closure_env#1}<core::result::Result<(), rustc_span::ErrorGuaranteed>, rustc_driver_impl::run_compiler::{closure_env#0}>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, core::result::Result<(), rustc_span::ErrorGuaranteed>>, ()>
+                               at /home/gh-mav3ri3k/rust/library/core/src/ops/function.rs:250:5
+  94:     0xffac89231cbc - call_once<(), dyn core::ops::function::FnOnce<(), Output=()>, alloc::alloc::Global>
+                               at /home/gh-mav3ri3k/rust/library/alloc/src/boxed.rs:2063:9
+  95:     0xffac89231cbc - call_once<(), alloc::boxed::Box<dyn core::ops::function::FnOnce<(), Output=()>, alloc::alloc::Global>, alloc::alloc::Global>
+                               at /home/gh-mav3ri3k/rust/library/alloc/src/boxed.rs:2063:9
+  96:     0xffac8923bb0c - std::sys::pal::unix::thread::Thread::new::thread_start::hefe0a6e567aa72cf
+                               at /home/gh-mav3ri3k/rust/library/std/src/sys/pal/unix/thread.rs:108:17
+  97:     0xffac8909d5c8 - start_thread
+                               at ./nptl/pthread_create.c:442:8
+  98:     0xffac89105edc - thread_start
+                               at ./misc/../sysdeps/unix/sysv/linux/aarch64/clone.S:79
+  99:                0x0 - <unknown>
+
+
+rustc version: 1.80.0-dev
+platform: aarch64-unknown-linux-gnu
+
+query stack during panic:
+#0 [resolver_for_lowering_raw] getting the resolver for lowering
+end of query stack

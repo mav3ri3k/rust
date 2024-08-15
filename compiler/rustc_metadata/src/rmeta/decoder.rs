@@ -28,7 +28,7 @@ use rustc_session::cstore::{CrateSource, ExternCrate};
 use rustc_session::Session;
 use rustc_span::symbol::kw;
 use rustc_span::{BytePos, Pos, SpanData, SpanDecoder, SyntaxContext, DUMMY_SP};
-use tracing::debug;
+use tracing::{debug, error};
 
 use proc_macro::bridge::client::ProcMacro;
 use std::iter::TrustedLen;
@@ -57,7 +57,16 @@ impl std::ops::Deref for MetadataBlob {
 impl MetadataBlob {
     /// Runs the [`MemDecoder`] validation and if it passes, constructs a new [`MetadataBlob`].
     pub fn new(slice: OwnedSlice) -> Result<Self, ()> {
+<<<<<<< HEAD
         if MemDecoder::new(&slice, 0).is_ok() { Ok(Self(slice)) } else { Err(()) }
+=======
+        if MemDecoder::new_cheat(&slice, 0).is_ok() {
+            Ok(Self(slice))
+        } else {
+            error!("Why!!!!!");
+            Err(())
+        }
+>>>>>>> 4b3a9d3874f (Working detached head)
     }
 
     /// Since this has passed the validation of [`MetadataBlob::new`], this returns bytes which are

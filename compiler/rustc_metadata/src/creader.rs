@@ -415,7 +415,7 @@ impl<'a, 'tcx> CrateLoader<'a, 'tcx> {
         let cnum = feed.key();
 
         info!(
-            "register crate `{}` (cnum = {}. private_dep = {})",
+            "registerd crate `{}` (cnum = {}. private_dep = {})",
             crate_root.name(),
             cnum,
             private_dep
@@ -620,10 +620,33 @@ impl<'a, 'tcx> CrateLoader<'a, 'tcx> {
     }
 
     fn load(&self, locator: &mut CrateLocator<'_>) -> Result<Option<LoadResult>, CrateError> {
+<<<<<<< HEAD
+=======
+        let fmt_name = format!("{:?}", locator.crate_name);
+        let is_my_macro = if fmt_name == "\"my_macro\"" {
+            debug!("Inside load fn, Crate Name: {:?}", locator.crate_name);
+            true
+        } else {
+            false
+        };
+
+>>>>>>> 4b3a9d3874f (Working detached head)
         let Some(library) = locator.maybe_load_library_crate()? else {
             return Ok(None);
         };
 
+<<<<<<< HEAD
+=======
+        // WARN
+        // FIXME
+        // ASSUMPTION: Currently by design we know it is loaded only once
+        // So circumvent all checking
+        if is_my_macro {
+            info!("Returning wasm library");
+            return Ok(Some(LoadResult::Loaded(library)));
+        }
+
+>>>>>>> 4b3a9d3874f (Working detached head)
         // In the case that we're loading a crate, but not matching
         // against a hash, we could load a crate which has the same hash
         // as an already loaded crate. If this is the case prevent

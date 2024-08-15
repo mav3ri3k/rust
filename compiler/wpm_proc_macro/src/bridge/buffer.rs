@@ -41,17 +41,17 @@ impl DerefMut for Buffer {
 
 impl Buffer {
     #[inline]
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self::default()
     }
 
     #[inline]
-    pub fn clear(&mut self) {
+    pub(super) fn clear(&mut self) {
         self.len = 0;
     }
 
     #[inline]
-    pub fn take(&mut self) -> Self {
+    pub(super) fn take(&mut self) -> Self {
         mem::take(self)
     }
 

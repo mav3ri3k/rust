@@ -5,6 +5,7 @@ use super::*;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
+use serde::{Serialize, Deserialize};
 
 macro_rules! define_client_handles {
     (
@@ -31,7 +32,8 @@ macro_rules! define_client_handles {
         }
 
         $(
-            pub(crate) struct $oty {
+            #[derive(Serialize, Deserialize, Debug)]
+            pub struct $oty {
                 handle: handle::Handle,
                 // Prevent Send and Sync impls. `!Send`/`!Sync` is the usual
                 // way of doing this, but that requires unstable features.
@@ -81,7 +83,7 @@ macro_rules! define_client_handles {
 
         $(
             #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-            pub(crate) struct $ity {
+            pub struct $ity {
                 handle: handle::Handle,
                 // Prevent Send and Sync impls. `!Send`/`!Sync` is the usual
                 // way of doing this, but that requires unstable features.
@@ -153,7 +155,7 @@ macro_rules! define_client_side {
         $(fn $method:ident($($arg:ident: $arg_ty:ty),* $(,)?) $(-> $ret_ty:ty)?;)*
     }),* $(,)?) => {
         $(impl $name {
-            $(pub(crate) fn $method($($arg: $arg_ty),*) $(-> $ret_ty)? {
+            $(pub fn $method($($arg: $arg_ty),*) $(-> $ret_ty)? {
                 Bridge::with(|bridge| {
                     let mut buf = bridge.cached_buffer.take();
 
@@ -287,7 +289,7 @@ fn maybe_install_panic_hook(force_show_panics: bool) {
             // unwind back to the compiler, but if the panic doesn't unwind we'll abort before
             // the compiler has a chance to print an error. So we special-case PanicInfo where
             // can_unwind is false.
-            if force_show_panics || !is_available() || !info.can_unwind() {
+            if force_show_panics || !info.can_unwind() {
                 prev(info)
             }
         }));
@@ -344,14 +346,6 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
     buf
 }
 
-
-pub fn run_wpm_client(
-    config: BridgeConfig<'_>,
-) -> Buffer {
-    let BridgeConfig { input: mut buf, dispatch, force_show_panics, .. } = config;
-    todo!();
-}
-
 impl Client<crate::TokenStream, crate::TokenStream> {
     pub const fn expand1(f: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy) -> Self {
         Client {
@@ -398,13 +392,6 @@ pub enum ProcMacro {
         name: &'static str,
         client: Client<crate::TokenStream, crate::TokenStream>,
     },
-
-    WasmBang {
-        name: &'static str,
-        path: &'static str,
-        // instead of receiving the function
-        // it is directly run on the client
-    },
 }
 
 impl ProcMacro {
@@ -413,7 +400,6 @@ impl ProcMacro {
             ProcMacro::CustomDerive { trait_name, .. } => trait_name,
             ProcMacro::Attr { name, .. } => name,
             ProcMacro::Bang { name, .. } => name,
-            ProcMacro::WasmBang { name, .. } => name,
         }
     }
 
@@ -431,18 +417,11 @@ impl ProcMacro {
     ) -> Self {
         ProcMacro::Attr { name, client: Client::expand2(expand) }
     }
-    pub const fn bang(
 
+    pub const fn bang(
         name: &'static str,
         expand: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy,
-        ) -> Self {
-        ProcMacro::Bang { name, client: Client::expand1(expand) }
-    }
-
-    pub const fn wasmbang(
-        name: &'static str,
-        path: &'static str,
     ) -> Self {
-        ProcMacro::WasmBang { name, path }
+        ProcMacro::Bang { name, client: Client::expand1(expand) }
     }
 }

@@ -270,6 +270,15 @@ impl<'a> MemDecoder<'a> {
         Ok(MemDecoder { start, current: data[position..].as_ptr(), end, _marker: PhantomData })
     }
 
+    // WARN
+    // FIXME
+    // ONLY FOR TESTING WASM PROC MACRO
+    #[inline]
+    pub fn new_cheat(data: &'a [u8], position: usize) -> Result<MemDecoder<'a>, ()> {
+        let Range { start, end } = data.as_ptr_range();
+        Ok(MemDecoder { start, current: data[position..].as_ptr(), end, _marker: PhantomData })
+    }
+
     #[inline]
     pub fn split_at(&self, position: usize) -> MemDecoder<'a> {
         assert!(position <= self.len());

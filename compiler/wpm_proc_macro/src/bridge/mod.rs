@@ -6,6 +6,7 @@
 //! (from the same source) by different compilers with potentially mismatching
 //! Rust ABIs (e.g., stage0/bin/rustc vs stage1/bin/rustc during bootstrap).
 
+#![allow(rustc::default_hash_types)]
 #![deny(unsafe_code)]
 
 use crate::{Delimiter, Level, Spacing};
@@ -153,7 +154,7 @@ macro_rules! reverse_decode {
 #[allow(unsafe_code)]
 mod arena;
 #[allow(unsafe_code)]
-pub mod buffer;
+mod buffer;
 #[deny(unsafe_code)]
 pub mod client;
 #[allow(unsafe_code)]
@@ -546,35 +547,3 @@ compound_traits!(
 compound_traits!(
     struct Range<T> { start, end }
 );
-
-pub mod wpm {
-    #![allow(dead_code)]
-    use super::*;
-    use crate::TokenStream;
-
-    fn run_server(ts: TokenStream) -> Result<TokenStream, PanicMessage>{
-        let mut buf = Buffer::new();
-
-        // encode input tokensteam from compiler
-        ts.0.encode(&mut buf, &mut ());
-
-        // pass buf to wasm client
-        run_client(&mut buf);
-        let ts: TokenStream = "let x = 3".parse().unwrap();
-
-        // decode output
-        let output_ts = <TokenStream>::decode(buf, &mut());
-
-        // return output
-        output_ts
-    }
-
-    fn run_client(buf:  &mut Buffer) {
-        let ts = <TokenStream>::decode(buf, &mut());
-
-        // run wasm function
-        
-        let output_ts = TokenStream::new();
-        output_ts.0.encode(buf, &mut ());
-    }
-}

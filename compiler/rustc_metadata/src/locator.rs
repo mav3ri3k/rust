@@ -219,6 +219,7 @@ use crate::rmeta::{rustc_version, MetadataBlob, METADATA_HEADER};
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_data_structures::memmap::Mmap;
 use rustc_data_structures::owned_slice::slice_owned;
+use rustc_data_structures::owned_slice::OwnedSlice;
 use rustc_data_structures::svh::Svh;
 use rustc_errors::{DiagArgValue, IntoDiagArg};
 use rustc_fs_util::try_canonicalize;
@@ -231,7 +232,11 @@ use rustc_session::Session;
 use rustc_span::symbol::Symbol;
 use rustc_span::Span;
 use rustc_target::spec::{Target, TargetTriple};
+<<<<<<< HEAD
 use tracing::{debug, info};
+=======
+use tracing::{debug, error, info, warn};
+>>>>>>> 4b3a9d3874f (Working detached head)
 
 use snap::read::FrameDecoder;
 use std::borrow::Cow;
@@ -542,6 +547,77 @@ impl<'a> CrateLocator<'a> {
         flavor: CrateFlavor,
         slot: &mut Option<(Svh, MetadataBlob, PathBuf)>,
     ) -> Result<Option<(PathBuf, PathKind)>, CrateError> {
+<<<<<<< HEAD
+=======
+        let fmt_name = format!("{:?}", self.crate_name);
+        let is_my_macro = if fmt_name == "\"my_macro\"" {
+            info!(
+                "Extracting one fn, Crate Name: {:?}, Flavor: {:?}",
+                self.crate_name, flavor
+            );
+            true
+        } else {
+            false
+        };
+
+        // WARN temporary thing for wasm files
+        // WARN just take first match
+        // WARN assume this is first time seeing this
+        // WARN also do not update slot
+        if flavor == CrateFlavor::Wasm {
+            // WARN I think this only works because of assumption
+            // WARN that it would iter
+            let Some((pathbuf, pathkind)) = m.iter().next() else {
+                if is_my_macro {
+                    warn!("this should not be none");
+                };
+                return Ok(None);
+            };
+
+            info!("Path:{:?}, Pathkind: {:?}", pathbuf, pathkind);
+            info!("Metadata: Loading");
+            let large_num = 333333333333;
+            let sudo_hash = Svh::new(Fingerprint::new(large_num, large_num));
+
+            info!("Getting metadata for wasm artifact");
+
+            let mut vec: Vec<u8> = vec![1; 10];
+            pub const MAGIC_END_BYTES: &[u8] = b"rust-end-file";
+            vec.extend(MAGIC_END_BYTES);
+            info!("vec: {:?}", vec);
+            let slice: OwnedSlice = slice_owned(vec, |v| &v[..]);
+            info!("Slice created");
+
+            let Ok(sudo_metadata) = MetadataBlob::new(slice) else {
+                error!("Failed converting metadata slice");
+                return Ok(None);
+            };
+
+            /*
+            let sudo_metadata = match get_metadata_section(
+                self.target,
+                flavor,
+                &pathbuf,
+                self.metadata_loader,
+                self.cfg_version,
+            ) {
+                Ok(blob) => blob,
+                Err(_) => {
+                    error!("Could not load metadata");
+                    return Ok(None);
+                }
+            };
+            */
+
+            info!("Updating slot");
+            *slot = Some((sudo_hash, sudo_metadata, pathbuf.clone()));
+
+            let ret = (pathbuf.clone(), pathkind.clone());
+            info!("Extracting wasm blob. Result: {:?}", ret);
+            return Ok(Some(ret));
+        }
+
+>>>>>>> 4b3a9d3874f (Working detached head)
         // If we are producing an rlib, and we've already loaded metadata, then
         // we should not attempt to discover further crate sources (unless we're
         // locating a proc macro; exact logic is in needs_crate_flavor). This means
@@ -853,15 +929,72 @@ fn get_metadata_section<'p>(
 
             slice_owned(mmap, Deref::deref)
         }
+<<<<<<< HEAD
+=======
+        CrateFlavor::Wasm => {
+            /*
+            let empty_vec: Vec<u8> = Vec::new();
+            info!("Created empty slice");
+            slice_owned(empty_vec, Deref::deref)
+            */
+
+            info!("Wasm File loading: {:?}", filename);
+            let file = std::fs::File::open(filename).map_err(|_| {
+                error!("Failed to open wasm file");
+                MetadataError::LoadFailure(format!(
+                    "failed to open wasm metadata: '{}'",
+                    filename.display()
+                ))
+            })?;
+
+            /*
+            pub const MAGIC_END_BYTES: &[u8] = b"rust-end-file";
+
+            file.write_all(MAGIC_END_BYTES).map_err(|_| {
+                error!("Failed to add magic end bytes");
+                MetadataError::LoadFailure(format!(
+                    "failed to open wasm metadata: '{}'",
+                    filename.display()
+                ))
+            })?;
+
+            info!("Extended with magic bytes");
+            */
+
+            let mmap = unsafe { Mmap::map(file) };
+            info!("try load mmap");
+            let mmap = mmap.map_err(|_| {
+                error!("Error at mmap");
+                MetadataError::LoadFailure(format!(
+                    "failed to mmap rmeta metadata: '{}'",
+                    filename.display()
+                ))
+            })?;
+            info!("Wasm file loaded");
+            slice_owned(mmap, Deref::deref)
+        }
+>>>>>>> 4b3a9d3874f (Working detached head)
     };
     let Ok(blob) = MetadataBlob::new(raw_bytes) else {
+        error!("Could not crate metadata blob");
         return Err(MetadataError::LoadFailure(format!(
             "corrupt metadata encountered in {}",
             filename.display()
         )));
     };
+    info!("Blob ready");
+    // WARN
+    // FIXME
+    // SKIOP CHECKING COMPATIBILITY FOR WASM
+    if flavor == CrateFlavor::Wasm {
+        return Ok(blob);
+    };
+
     match blob.check_compatibility(cfg_version) {
-        Ok(()) => Ok(blob),
+        Ok(()) => {
+            info!("Blob returned");
+            Ok(blob)
+        }
         Err(None) => Err(MetadataError::LoadFailure(format!(
             "invalid metadata version found: {}",
             filename.display()
