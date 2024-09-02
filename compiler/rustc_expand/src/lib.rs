@@ -24,6 +24,7 @@ mod errors;
 mod mbe;
 mod placeholders;
 mod proc_macro_server;
+mod wpm;
 
 pub use mbe::macro_rules::compile_declarative_macro;
 pub mod base;

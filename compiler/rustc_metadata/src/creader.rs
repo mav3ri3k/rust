@@ -74,6 +74,7 @@ impl std::fmt::Debug for CStore {
     }
 }
 
+// TODO(mav3ri3k) Loader for wpm
 pub struct CrateLoader<'a, 'tcx: 'a> {
     // Immutable configuration.
     tcx: TyCtxt<'tcx>,

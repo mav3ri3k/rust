@@ -279,6 +279,7 @@ pub(crate) enum CrateFlavor {
     Rlib,
     Rmeta,
     Dylib,
+    Wpm,
 }
 
 impl fmt::Display for CrateFlavor {
@@ -287,6 +288,7 @@ impl fmt::Display for CrateFlavor {
             CrateFlavor::Rlib => "rlib",
             CrateFlavor::Rmeta => "rmeta",
             CrateFlavor::Dylib => "dylib",
+            CrateFlavor::Wpm => "wpm",
         })
     }
 }
@@ -297,6 +299,7 @@ impl IntoDiagArg for CrateFlavor {
             CrateFlavor::Rlib => DiagArgValue::Str(Cow::Borrowed("rlib")),
             CrateFlavor::Rmeta => DiagArgValue::Str(Cow::Borrowed("rmeta")),
             CrateFlavor::Dylib => DiagArgValue::Str(Cow::Borrowed("dylib")),
+            CrateFlavor::Wpm => DiagArgValue::Str(Cow::Borrowed("wpm")),
         }
     }
 }
@@ -392,11 +395,14 @@ impl<'a> CrateLocator<'a> {
 
         let rmeta_suffix = ".rmeta";
         let rlib_suffix = ".rlib";
+        let wpm_suffix = ".wpm";
         let dylib_suffix = &self.target.dll_suffix;
         let staticlib_suffix = &self.target.staticlib_suffix;
 
-        let mut candidates: FxHashMap<_, (FxHashMap<_, _>, FxHashMap<_, _>, FxHashMap<_, _>)> =
-            Default::default();
+        let mut candidates: FxHashMap<
+            _,
+            (FxHashMap<_, _>, FxHashMap<_, _>, FxHashMap<_, _>, FxHashMap<_, _>),
+        > = Default::default();
 
         // First, find all possible candidate rlibs and dylibs purely based on
         // the name of the files themselves. We're trying to match against an
@@ -442,7 +448,7 @@ impl<'a> CrateLocator<'a> {
 
                 info!("lib candidate: {}", spf.path.display());
 
-                let (rlibs, rmetas, dylibs) = candidates.entry(hash.to_string()).or_default();
+                let (rlibs, rmetas, dylibs, wpm) = candidates.entry(hash.to_string()).or_default();
                 let path = try_canonicalize(&spf.path).unwrap_or_else(|_| spf.path.clone());
                 if seen_paths.contains(&path) {
                     continue;
@@ -452,6 +458,7 @@ impl<'a> CrateLocator<'a> {
                     CrateFlavor::Rlib => rlibs.insert(path, search_path.kind),
                     CrateFlavor::Rmeta => rmetas.insert(path, search_path.kind),
                     CrateFlavor::Dylib => dylibs.insert(path, search_path.kind),
+                    CrateFlavor::Wpm => wpm.insert(path, search_path.kind),
                 };
             }
         }
@@ -465,8 +472,8 @@ impl<'a> CrateLocator<'a> {
         // libraries corresponds to the crate id and hash criteria that this
         // search is being performed for.
         let mut libraries = FxHashMap::default();
-        for (_hash, (rlibs, rmetas, dylibs)) in candidates {
-            if let Some((svh, lib)) = self.extract_lib(rlibs, rmetas, dylibs)? {
+        for (_hash, (rlibs, rmetas, dylibs, wpm)) in candidates {
+            if let Some((svh, lib)) = self.extract_lib(rlibs, rmetas, dylibs, wpm)? {
                 libraries.insert(svh, lib);
             }
         }
@@ -501,6 +508,7 @@ impl<'a> CrateLocator<'a> {
         rlibs: FxHashMap<PathBuf, PathKind>,
         rmetas: FxHashMap<PathBuf, PathKind>,
         dylibs: FxHashMap<PathBuf, PathKind>,
+        wpms: FxHashMap<PathBuf, PathKind>,
     ) -> Result<Option<(Svh, Library)>, CrateError> {
         let mut slot = None;
         // Order here matters, rmeta should come first. See comment in
@@ -509,11 +517,13 @@ impl<'a> CrateLocator<'a> {
             rmeta: self.extract_one(rmetas, CrateFlavor::Rmeta, &mut slot)?,
             rlib: self.extract_one(rlibs, CrateFlavor::Rlib, &mut slot)?,
             dylib: self.extract_one(dylibs, CrateFlavor::Dylib, &mut slot)?,
+            wpm: self.extract_one(wpms, CrateFlavor::Wpm, &mut slot)?,
         };
         Ok(slot.map(|(svh, metadata, _)| (svh, Library { source, metadata })))
     }
 
     fn needs_crate_flavor(&self, flavor: CrateFlavor) -> bool {
+        // TODO(mav3ri3k) Check if this needs to be done also for wpm
         if flavor == CrateFlavor::Dylib && self.is_proc_macro {
             return true;
         }
@@ -709,6 +719,7 @@ impl<'a> CrateLocator<'a> {
         let mut rlibs = FxHashMap::default();
         let mut rmetas = FxHashMap::default();
         let mut dylibs = FxHashMap::default();
+        let mut wpms = FxHashMap::default();
         for loc in &self.exact_paths {
             if !loc.canonicalized().exists() {
                 return Err(CrateError::ExternLocationNotExist(
@@ -732,6 +743,7 @@ impl<'a> CrateLocator<'a> {
             if file.starts_with("lib") && (file.ends_with(".rlib") || file.ends_with(".rmeta"))
                 || file.starts_with(self.target.dll_prefix.as_ref())
                     && file.ends_with(self.target.dll_suffix.as_ref())
+                    && file.ends_with(".wpm")
             {
                 // Make sure there's at most one rlib and at most one dylib.
                 // Note to take care and match against the non-canonicalized name:
@@ -746,6 +758,8 @@ impl<'a> CrateLocator<'a> {
                     rlibs.insert(loc_canon, PathKind::ExternFlag);
                 } else if loc.file_name().unwrap().to_str().unwrap().ends_with(".rmeta") {
                     rmetas.insert(loc_canon, PathKind::ExternFlag);
+                } else if loc.file_name().unwrap().to_str().unwrap().ends_with(".wpm") {
+                    rmetas.insert(loc_canon, PathKind::ExternFlag);
                 } else {
                     dylibs.insert(loc_canon, PathKind::ExternFlag);
                 }
@@ -757,7 +771,9 @@ impl<'a> CrateLocator<'a> {
         }
 
         // Extract the dylib/rlib/rmeta triple.
-        Ok(self.extract_lib(rlibs, rmetas, dylibs)?.map(|(_, lib)| lib))
+        // TODO(mav3ri3k) Modify exract lib fun
+        // Loading metadata needs refactoring
+        Ok(self.extract_lib(rlibs, rmetas, dylibs, wpm)?.map(|(_, lib)| lib))
     }
 
     pub(crate) fn into_error(self, root: Option<CratePaths>) -> CrateError {
@@ -834,6 +850,10 @@ fn get_metadata_section<'p>(
 
                 slice_owned(inflated, Deref::deref)
             }
+        }
+        CrateFlavor::Wpm => {
+            // TODO(mav3ri3k)
+            todo!()
         }
         CrateFlavor::Rmeta => {
             // mmap the file, because only a small fraction of it is read.

@@ -42,6 +42,9 @@
 #[doc(hidden)]
 pub mod bridge;
 
+#[unstable(feature = "wpm", issue = "3333")]
+pub mod wpm;
+
 mod diagnostic;
 
 #[unstable(feature = "proc_macro_diagnostic", issue = "54140")]
