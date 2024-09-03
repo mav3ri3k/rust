@@ -137,7 +137,7 @@ impl<'a> std::fmt::Debug for CrateDump<'a> {
             writeln!(fmt, "  cnum: {cnum}")?;
             writeln!(fmt, "  hash: {}", data.hash())?;
             writeln!(fmt, "  reqd: {:?}", data.dep_kind())?;
-            let CrateSource { dylib, rlib, rmeta } = data.source();
+            let CrateSource { dylib, rlib, rmeta, wpm } = data.source();
             if let Some(dylib) = dylib {
                 writeln!(fmt, "  dylib: {}", dylib.0.display())?;
             }
@@ -146,6 +146,9 @@ impl<'a> std::fmt::Debug for CrateDump<'a> {
             }
             if let Some(rmeta) = rmeta {
                 writeln!(fmt, "   rmeta: {}", rmeta.0.display())?;
+            }
+            if let Some(wpm) = wpm {
+                writeln!(fmt, "   wpm: {}", wpm.0.display())?;
             }
         }
         Ok(())

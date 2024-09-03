@@ -390,6 +390,7 @@ impl<'a> CrateLocator<'a> {
         let rlib_prefix = rmeta_prefix;
         let dylib_prefix =
             &format!("{}{}{}", self.target.dll_prefix, self.crate_name, extra_prefix);
+        let wpm_prefix = &format!("{}{}{}", self.target.dll_prefix, self.crate_name, extra_prefix);
         let staticlib_prefix =
             &format!("{}{}{}", self.target.staticlib_prefix, self.crate_name, extra_prefix);
 
@@ -436,6 +437,8 @@ impl<'a> CrateLocator<'a> {
                     (&f[rmeta_prefix.len()..(f.len() - rmeta_suffix.len())], CrateFlavor::Rmeta)
                 } else if f.starts_with(dylib_prefix) && f.ends_with(dylib_suffix.as_ref()) {
                     (&f[dylib_prefix.len()..(f.len() - dylib_suffix.len())], CrateFlavor::Dylib)
+                } else if f.starts_with(wpm_prefix) && f.ends_with(wpm_suffix) {
+                    (&f[wpm_prefix.len()..(f.len() - wpm_suffix.len())], CrateFlavor::Wpm)
                 } else {
                     if f.starts_with(staticlib_prefix) && f.ends_with(staticlib_suffix.as_ref()) {
                         self.crate_rejections.via_kind.push(CrateMismatch {
@@ -740,10 +743,10 @@ impl<'a> CrateLocator<'a> {
                 ));
             };
 
-            if file.starts_with("lib") && (file.ends_with(".rlib") || file.ends_with(".rmeta"))
+            if file.starts_with("lib")
+                && (file.ends_with(".rlib") || file.ends_with(".rmeta") || file.ends_with(".wpm"))
                 || file.starts_with(self.target.dll_prefix.as_ref())
                     && file.ends_with(self.target.dll_suffix.as_ref())
-                    && file.ends_with(".wpm")
             {
                 // Make sure there's at most one rlib and at most one dylib.
                 // Note to take care and match against the non-canonicalized name:
@@ -760,6 +763,8 @@ impl<'a> CrateLocator<'a> {
                     rmetas.insert(loc_canon, PathKind::ExternFlag);
                 } else if loc.file_name().unwrap().to_str().unwrap().ends_with(".wpm") {
                     rmetas.insert(loc_canon, PathKind::ExternFlag);
+                } else if loc.file_name().unwrap().to_str().unwrap().ends_with(".wpm") {
+                    wpms.insert(loc_canon, PathKind::ExternFlag);
                 } else {
                     dylibs.insert(loc_canon, PathKind::ExternFlag);
                 }
