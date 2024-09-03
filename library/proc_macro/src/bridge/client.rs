@@ -3,7 +3,6 @@
 use super::*;
 
 use std::cell::RefCell;
-use std::env;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
 
@@ -244,7 +243,17 @@ impl Bridge<'_> {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn is_available() -> bool {
+    state::with(|s| s.is_some())
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn is_available() -> bool {
+    //TODO(mav3ri3k) Check for long term solution
+    //Ideally based on some key-value in Cargo.toml of file
+    //Also implement some relevant checks in `mod state`
+    #[allow(dead_code)]
     let key = env::var("RUSTC_TEST_WPM");
     println!("rustc_test_wpm: {key:?}");
     let cnd = match key {
@@ -257,10 +266,7 @@ pub(crate) fn is_available() -> bool {
         }
         Err(_) => false,
     };
-    if cnd == true {
-        return true;
-    };
-    state::with(|s| s.is_some()) || cnd
+    true
 }
 
 /// A client-side RPC entry-point, which may be using a different `proc_macro`

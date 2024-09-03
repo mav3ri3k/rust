@@ -773,7 +773,7 @@ impl<'a> CrateLocator<'a> {
         // Extract the dylib/rlib/rmeta triple.
         // TODO(mav3ri3k) Modify exract lib fun
         // Loading metadata needs refactoring
-        Ok(self.extract_lib(rlibs, rmetas, dylibs, wpm)?.map(|(_, lib)| lib))
+        Ok(self.extract_lib(rlibs, rmetas, dylibs, wpms)?.map(|(_, lib)| lib))
     }
 
     pub(crate) fn into_error(self, root: Option<CratePaths>) -> CrateError {
