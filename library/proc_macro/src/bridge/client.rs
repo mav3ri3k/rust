@@ -291,6 +291,10 @@ pub struct Client<I, O> {
     pub(super) _marker: PhantomData<fn(I) -> O>,
 }
 
+pub struct WpmClient {
+    pub run: fn(u32) -> u32,
+}
+
 impl<I, O> Copy for Client<I, O> {}
 impl<I, O> Clone for Client<I, O> {
     fn clone(&self) -> Self {
@@ -366,6 +370,32 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
     buf
 }
 
+impl WpmClient {
+    //f is the main expand function exported by wasm binary
+    //During tests, a extra alloc function was needed to manage linear mem
+    //Sample code exported from wasm client
+    //
+    //#[no_mangle]
+    //pub extern "C" fn run(ptr: *mut c_void) -> *mut c_void {
+    //    let ts_ptr: *mut pm::TokenStream = ptr as *mut pm::TokenStream;
+    //    let ts: &mut pm::TokenStream = unsafe { &mut *ts_ptr };
+    //
+    //    test(ts);
+    //
+    //    // ptr is just place holder for the moment
+    //    // This would return pointer where final tokenstream is dumped
+    //    // returned after running test()
+    //    ptr
+    //}
+    //
+    //fn test(_ts: &pm::TokenStream) -> pm::TokenStream {
+    //    "let x = 12;".parse().unwrap()
+    //}
+    pub const fn expand(f: impl Fn(u32) -> u32) -> Self {
+        todo!()
+    }
+}
+
 impl Client<crate::TokenStream, crate::TokenStream> {
     pub const fn expand1(f: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy) -> Self {
         Client {
@@ -412,6 +442,11 @@ pub enum ProcMacro {
         name: &'static str,
         client: Client<crate::TokenStream, crate::TokenStream>,
     },
+
+    WpmBang {
+        name: &'static str,
+        client: WpmClient,
+    },
 }
 
 impl ProcMacro {
@@ -420,6 +455,7 @@ impl ProcMacro {
             ProcMacro::CustomDerive { trait_name, .. } => trait_name,
             ProcMacro::Attr { name, .. } => name,
             ProcMacro::Bang { name, .. } => name,
+            ProcMacro::WpmBang { name, .. } => name,
         }
     }
 
@@ -443,5 +479,9 @@ impl ProcMacro {
         expand: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy,
     ) -> Self {
         ProcMacro::Bang { name, client: Client::expand1(expand) }
+    }
+
+    pub const fn wpm_bang(name: &'static str, expand: impl Fn(u32) -> u32 + Copy) -> Self {
+        ProcMacro::Bang { name, client: Client::expand(expand) }
     }
 }

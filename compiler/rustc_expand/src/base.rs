@@ -279,6 +279,15 @@ where
     }
 }
 
+pub trait WasmBangProcMacro {
+    fn expand<'cx>(
+        &self,
+        ecx: &'cx mut ExtCtxt<'_>,
+        span: Span,
+        ts: TokenStream,
+    ) -> Result<TokenStream, ErrorGuaranteed>;
+}
+
 pub trait BangProcMacro {
     fn expand<'cx>(
         &self,

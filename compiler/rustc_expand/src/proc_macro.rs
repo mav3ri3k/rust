@@ -41,6 +41,36 @@ fn exec_strategy(ecx: &ExtCtxt<'_>) -> impl pm::bridge::server::ExecutionStrateg
     )
 }
 
+pub struct WasmBangProcMacro {
+    pub client: pm::bridge::client::WpmClient,
+}
+
+impl base::WasmBangProcMacro for WasmBangProcMacro {
+    fn expand<'cx>(
+        &self,
+        ecx: &'cx mut ExtCtxt<'_>,
+        span: Span,
+        input: TokenStream,
+    ) -> Result<TokenStream, ErrorGuaranteed> {
+        let _timer =
+            ecx.sess.prof.generic_activity_with_arg_recorder("expand_proc_macro", |recorder| {
+                recorder.record_arg_with_span(ecx.sess.source_map(), ecx.expansion_descr(), span);
+            });
+
+        let proc_macro_backtrace = ecx.ecfg.proc_macro_backtrace;
+        let strategy = exec_strategy(ecx);
+        let server = proc_macro_server::Rustc::new(ecx);
+        self.client.run(&strategy, server, input, proc_macro_backtrace).map_err(|e| {
+            ecx.dcx().emit_err(errors::ProcMacroPanicked {
+                span,
+                message: e
+                    .as_str()
+                    .map(|message| errors::ProcMacroPanickedHelp { message: message.into() }),
+            })
+        })
+    }
+}
+
 pub struct BangProcMacro {
     pub client: pm::bridge::client::Client<pm::TokenStream, pm::TokenStream>,
 }
