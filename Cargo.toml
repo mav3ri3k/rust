@@ -60,6 +60,9 @@ exclude = [
   "src/tools/x",
   # stdarch has its own Cargo workspace
   "library/stdarch",
+  # HACK(mav3ri3k) wain has its own Cargo workspace
+  # Used here because it has zero dependencies
+  "library/wain",
 ]
 
 [profile.release.package.compiler_builtins]
