@@ -323,7 +323,7 @@ fn maybe_install_panic_hook(force_show_panics: bool) {
 fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
     config: BridgeConfig<'_>,
     f: impl FnOnce(A) -> R,
-    is_wpm: bool,
+    wpm_path: Option<Path>,
 ) -> Buffer {
     let BridgeConfig { input: mut buf, dispatch, force_show_panics, .. } = config;
 
@@ -344,7 +344,11 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
         //Update the value through some logic
         let is_wpm = false;
         #[allow(dead_code)]
-        let input = if is_wpm { eval_wpm(input) } else { input };
+        let input = match wpm_path {
+            Some(path) => eval_wpm(input, path),
+            None => input,
+        };
+
         let output = state::set(&state, || f(input));
 
         // Take the `cached_buffer` back out, for the output value.
@@ -379,7 +383,7 @@ impl Client<crate::TokenStream, crate::TokenStream> {
         Client {
             get_handle_counters: HandleCounters::get,
             run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
-                run_client(bridge, |input| f(crate::TokenStream(Some(input))).0, false)
+                run_client(bridge, |input| f(crate::TokenStream(Some(input))).0, None)
             }),
             _marker: PhantomData,
         }
@@ -398,7 +402,7 @@ impl Client<(crate::TokenStream, crate::TokenStream), crate::TokenStream> {
                     |(input, input2)| {
                         f(crate::TokenStream(Some(input)), crate::TokenStream(Some(input2))).0
                     },
-                    false,
+                    None,
                 )
             }),
             _marker: PhantomData,
