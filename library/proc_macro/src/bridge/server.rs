@@ -151,6 +151,7 @@ macro_rules! define_mark_types_impls {
 }
 with_api!(Self, self_, define_mark_types_impls);
 
+// handles encoding and decoding over the bridge
 struct Dispatcher<S: Types> {
     handle_store: HandleStore<S>,
     server: S,

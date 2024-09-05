@@ -1,6 +1,7 @@
 //! Client-side types.
 
 use super::*;
+use wpm::eval_wpm;
 
 use std::cell::RefCell;
 use std::marker::PhantomData;
@@ -291,10 +292,6 @@ pub struct Client<I, O> {
     pub(super) _marker: PhantomData<fn(I) -> O>,
 }
 
-pub struct WpmClient {
-    pub run: fn(u32) -> u32,
-}
-
 impl<I, O> Copy for Client<I, O> {}
 impl<I, O> Clone for Client<I, O> {
     fn clone(&self) -> Self {
@@ -326,6 +323,7 @@ fn maybe_install_panic_hook(force_show_panics: bool) {
 fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
     config: BridgeConfig<'_>,
     f: impl FnOnce(A) -> R,
+    is_wpm: bool,
 ) -> Buffer {
     let BridgeConfig { input: mut buf, dispatch, force_show_panics, .. } = config;
 
@@ -341,6 +339,12 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
         // Put the buffer we used for input back in the `Bridge` for requests.
         let state = RefCell::new(Bridge { cached_buffer: buf.take(), dispatch, globals });
 
+        //TODO(mav3ri3k)
+        //Currently eval for is_wpm is dead branch
+        //Update the value through some logic
+        let is_wpm = false;
+        #[allow(dead_code)]
+        let input = if is_wpm { eval_wpm(input) } else { input };
         let output = state::set(&state, || f(input));
 
         // Take the `cached_buffer` back out, for the output value.
@@ -370,38 +374,12 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
     buf
 }
 
-impl WpmClient {
-    //f is the main expand function exported by wasm binary
-    //During tests, a extra alloc function was needed to manage linear mem
-    //Sample code exported from wasm client
-    //
-    //#[no_mangle]
-    //pub extern "C" fn run(ptr: *mut c_void) -> *mut c_void {
-    //    let ts_ptr: *mut pm::TokenStream = ptr as *mut pm::TokenStream;
-    //    let ts: &mut pm::TokenStream = unsafe { &mut *ts_ptr };
-    //
-    //    test(ts);
-    //
-    //    // ptr is just place holder for the moment
-    //    // This would return pointer where final tokenstream is dumped
-    //    // returned after running test()
-    //    ptr
-    //}
-    //
-    //fn test(_ts: &pm::TokenStream) -> pm::TokenStream {
-    //    "let x = 12;".parse().unwrap()
-    //}
-    pub const fn expand(f: impl Fn(u32) -> u32) -> Self {
-        todo!()
-    }
-}
-
 impl Client<crate::TokenStream, crate::TokenStream> {
     pub const fn expand1(f: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy) -> Self {
         Client {
             get_handle_counters: HandleCounters::get,
             run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
-                run_client(bridge, |input| f(crate::TokenStream(Some(input))).0)
+                run_client(bridge, |input| f(crate::TokenStream(Some(input))).0, false)
             }),
             _marker: PhantomData,
         }
@@ -415,9 +393,13 @@ impl Client<(crate::TokenStream, crate::TokenStream), crate::TokenStream> {
         Client {
             get_handle_counters: HandleCounters::get,
             run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
-                run_client(bridge, |(input, input2)| {
-                    f(crate::TokenStream(Some(input)), crate::TokenStream(Some(input2))).0
-                })
+                run_client(
+                    bridge,
+                    |(input, input2)| {
+                        f(crate::TokenStream(Some(input)), crate::TokenStream(Some(input2))).0
+                    },
+                    false,
+                )
             }),
             _marker: PhantomData,
         }
@@ -441,11 +423,6 @@ pub enum ProcMacro {
     Bang {
         name: &'static str,
         client: Client<crate::TokenStream, crate::TokenStream>,
-    },
-
-    WpmBang {
-        name: &'static str,
-        client: WpmClient,
     },
 }
 
@@ -479,9 +456,5 @@ impl ProcMacro {
         expand: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy,
     ) -> Self {
         ProcMacro::Bang { name, client: Client::expand1(expand) }
-    }
-
-    pub const fn wpm_bang(name: &'static str, expand: impl Fn(u32) -> u32 + Copy) -> Self {
-        ProcMacro::Bang { name, client: Client::expand(expand) }
     }
 }

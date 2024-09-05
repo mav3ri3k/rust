@@ -171,6 +171,8 @@ mod selfless_reify;
 pub mod server;
 #[allow(unsafe_code)]
 mod symbol;
+#[allow(unsafe_code)]
+mod wpm;
 
 use buffer::Buffer;
 pub use rpc::PanicMessage;
