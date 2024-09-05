@@ -345,7 +345,15 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
         let is_wpm = false;
         #[allow(dead_code)]
         let input = match wpm_path {
-            Some(path) => eval_wpm(input, path),
+            Some(path) => {
+                if let Some(output) = eval_wpm(input, path) {
+                    output
+                } else {
+                    //TODO(mav3ri3k)
+                    //Handle this panic
+                    panic!("No tokenstream returned after eval")
+                }
+            }
             None => input,
         };
 
