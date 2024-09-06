@@ -1,11 +1,12 @@
 //! Client-side types.
 
 use super::*;
-use wpm::eval_wpm;
 
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
+
+use crate::bridge::wpm::eval_wpm;
 
 macro_rules! define_client_handles {
     (
@@ -176,7 +177,7 @@ macro_rules! define_client_side {
 }
 with_api!(self, self, define_client_side);
 
-struct Bridge<'a> {
+pub struct Bridge<'a> {
     /// Reusable buffer (only `clear`-ed, never shrunk), primarily
     /// used for making requests.
     cached_buffer: Buffer,
@@ -192,7 +193,7 @@ impl<'a> !Send for Bridge<'a> {}
 impl<'a> !Sync for Bridge<'a> {}
 
 #[allow(unsafe_code)]
-mod state {
+pub mod state {
     use super::Bridge;
     use std::cell::{Cell, RefCell};
     use std::ptr;
@@ -323,7 +324,6 @@ fn maybe_install_panic_hook(force_show_panics: bool) {
 fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
     config: BridgeConfig<'_>,
     f: impl FnOnce(A) -> R,
-    wpm_path: Option<Path>,
 ) -> Buffer {
     let BridgeConfig { input: mut buf, dispatch, force_show_panics, .. } = config;
 
@@ -342,9 +342,9 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
         //TODO(mav3ri3k)
         //Currently eval for is_wpm is dead branch
         //Update the value through some logic
-        let is_wpm = false;
+        /*
         #[allow(dead_code)]
-        let input = match wpm_path {
+        let output = match wpm_path {
             Some(path) => {
                 if let Some(output) = eval_wpm(input, path) {
                     output
@@ -354,8 +354,9 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
                     panic!("No tokenstream returned after eval")
                 }
             }
-            None => input,
+            None => state::set(&state, || f(input)),
         };
+        */
 
         let output = state::set(&state, || f(input));
 
@@ -391,7 +392,19 @@ impl Client<crate::TokenStream, crate::TokenStream> {
         Client {
             get_handle_counters: HandleCounters::get,
             run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
-                run_client(bridge, |input| f(crate::TokenStream(Some(input))).0, None)
+                run_client(bridge, |input| f(crate::TokenStream(Some(input))).0)
+            }),
+            _marker: PhantomData,
+        }
+    }
+
+    //TODO(mav3ri3k)
+    //How to send path with the generic function ??
+    pub const fn expand_wpm(_path: &str) -> Self {
+        Client {
+            get_handle_counters: HandleCounters::get,
+            run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
+                run_client(bridge, |input| eval_wpm(crate::TokenStream(Some(input))).0)
             }),
             _marker: PhantomData,
         }
@@ -405,13 +418,9 @@ impl Client<(crate::TokenStream, crate::TokenStream), crate::TokenStream> {
         Client {
             get_handle_counters: HandleCounters::get,
             run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
-                run_client(
-                    bridge,
-                    |(input, input2)| {
-                        f(crate::TokenStream(Some(input)), crate::TokenStream(Some(input2))).0
-                    },
-                    None,
-                )
+                run_client(bridge, |(input, input2)| {
+                    f(crate::TokenStream(Some(input)), crate::TokenStream(Some(input2))).0
+                })
             }),
             _marker: PhantomData,
         }
@@ -444,7 +453,6 @@ impl ProcMacro {
             ProcMacro::CustomDerive { trait_name, .. } => trait_name,
             ProcMacro::Attr { name, .. } => name,
             ProcMacro::Bang { name, .. } => name,
-            ProcMacro::WpmBang { name, .. } => name,
         }
     }
 
@@ -468,5 +476,9 @@ impl ProcMacro {
         expand: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy,
     ) -> Self {
         ProcMacro::Bang { name, client: Client::expand1(expand) }
+    }
+
+    pub const fn wpm_bang(name: &'static str, path: &str) -> Self {
+        ProcMacro::Bang { name, client: Client::expand_wpm(path) }
     }
 }
