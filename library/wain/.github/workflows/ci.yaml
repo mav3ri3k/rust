@@ -1,0 +1,87 @@
+name: CI
+on: [push, pull_request]
+
+env:
+  RUST_BACKTRACE: full
+
+jobs:
+  unit-test:
+    name: unit tests
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run tests
+        run: cargo test --color always --all
+      - name: Build sources
+        run: cargo build --color always --all
+  beta:
+    name: Rust beta channel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@beta
+      - name: Run tests
+        run: cargo test --color always --all
+      - name: Build sources
+        run: cargo build --color always --all
+  linter:
+    name: clippy and rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt -- --color always --check
+      - run: cargo clippy --color always --all -- -D warnings
+  examples:
+    name: examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo run --example execute
+      - run: cargo run --example wat
+      - run: cargo run --example invoke
+      - run: cargo run examples/brainfxxk.wasm
+      - run: cargo run examples/brainfxxk.wat
+      - run: cargo run examples/mandelbrot.wasm
+      - run: cargo run examples/mandelbrot.wat
+      - run: cargo run examples/mt19937.wasm
+      - run: cargo run examples/mt19937.wat
+      - run: cargo run examples/n_queens.wasm
+      - run: cargo run examples/n_queens.wat
+      - run: cargo run examples/pi.wasm
+      - run: cargo run examples/pi.wat
+      - run: cargo run examples/primes.wasm
+      - run: cargo run examples/primes.wat
+      - run: cargo run examples/quicksort.wasm
+      - run: cargo run examples/quicksort.wat
+      - run: cargo run examples/sqrt.wasm
+      - run: cargo run examples/sqrt.wat
+      - run: cargo run examples/y_combinator.wasm
+      - run: cargo run examples/y_combinator.wat
+      - run: cargo run examples/fib.wasm
+      - run: cargo run examples/fib.wat
+      - run: cargo run examples/boyer_moore.wasm
+      - run: cargo run examples/boyer_moore.wat
+  spec-tests:
+    name: spec tests
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run spec tests
+        run: cargo run --release -- --allowed-failures 179
+        working-directory: ./spec-test

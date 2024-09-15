@@ -1,0 +1,83 @@
+[package]
+name = "wain"
+version = "0.1.7"
+authors = ["rhysd <lin90162@yahoo.co.jp>"]
+edition = "2021"
+description = "WebAssembly interpreter written in Safe Rust with zero dependencies"
+license = "MIT"
+homepage = "https://github.com/rhysd/wain"
+repository = "https://github.com/rhysd/wain"
+readme = "README.md"
+include = ["src/**/*.rs", "Cargo.toml", "examples/api/*.rs", "README.md"]
+keywords = ["wasm", "webassembly", "interpreter", "wat"]
+categories = ["wasm"]
+
+[package.metadata.release]
+pre-release-commit-message = "release {{crate_name}} {{version}}"
+consolidate-commits = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "wain"
+
+[profile.release]
+lto = true
+panic = "abort"
+codegen-units = 1
+
+[features]
+default = ["binary", "text"]
+binary = ["wain-syntax-binary"]
+text = ["wain-syntax-text"]
+
+[dependencies]
+wain-ast = { path = "./wain-ast", version = "0.2" }
+wain-syntax-text = { path = "./wain-syntax-text", version = "0.2", optional = true }
+wain-syntax-binary = { path = "./wain-syntax-binary", version = "0.1", optional = true }
+wain-validate = { path = "./wain-validate", version = "0.1" }
+wain-exec = { path = "./wain-exec", version = "0.3" }
+std = { path = "../std" }
+core = { path = "../core" }
+
+
+[dev-dependencies]
+cargo-husky = { version = "1", features = ["run-cargo-clippy", "run-cargo-fmt"] }
+
+[workspace]
+members = [
+    ".",
+    "wain-ast",
+    "wain-syntax-text",
+    "wain-syntax-binary",
+    "wain-validate",
+    "wain-exec",
+    "spec-test",
+]
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[[bench]]
+name = "examples"
+path = "benches/examples.rs"
+
+[[bench]]
+name = "parsers"
+path = "benches/parsers.rs"
+
+[[bench]]
+name = "validation"
+path = "benches/validation.rs"
+
+[[example]]
+name = "execute"
+path = "examples/api/execute.rs"
+
+[[example]]
+name = "wat"
+path = "examples/api/wat.rs"
+
+[[example]]
+name = "invoke"
+path = "examples/api/invoke.rs"

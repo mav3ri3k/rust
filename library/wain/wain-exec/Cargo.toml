@@ -1,0 +1,31 @@
+[package]
+name = "wain-exec"
+version = "0.3.1"
+authors = ["rhysd <lin90162@yahoo.co.jp>"]
+edition = "2021"
+description = "WebAssembly syntax tree executor for wain project"
+license = "MIT"
+homepage = "https://github.com/rhysd/wain/tree/master/wain-exec"
+repository = "https://github.com/rhysd/wain"
+readme = "README.md"
+include = ["src/**/*.rs", "Cargo.toml", "README.md"]
+keywords = ["wasm", "webassembly", "interpreter"]
+categories = ["wasm"]
+
+[package.metadata.release]
+pre-release-commit-message = "release {{crate_name}} {{version}}"
+consolidate-commits = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wain-ast = { path = "../wain-ast", version = "0.2" }
+std = { path = "../../std" }
+core = { path = "../../core" }
+
+[dev-dependencies]
+wain-syntax-text = { path = "../wain-syntax-text", version = "0.2" }
+wain-validate = { path = "../wain-validate", version = "0.1" }
+
+[badges]
+maintenance = { status = "actively-developed" }
