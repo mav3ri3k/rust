@@ -10,7 +10,7 @@ use wain_exec::{DefaultImporter, Runtime, Value};
 use wain_syntax_binary::parse;
 use wain_validate::validate;
 
-use super::client::TokenStream;
+use crate::TokenStream;
 
 use std::fs;
 use std::io;
@@ -58,7 +58,7 @@ fn instantiate_wpm(path: &str) -> Option<Runtime> {
 //I am doing some major ownership mishap here
 //This should be all red,
 //maybe compiler not complaining because of unsafe ?
-pub(super) fn eval_wpm(input: TokenStream, path: Path) -> Option<TokenStream> {
+pub(super) fn eval_wpm(input: TokenStream, path: &str) -> Option<TokenStream> {
     // Read wasm binary
     let mut runtime = instantiate_wpm(path)?;
     //TODO(mav3ri3k)
@@ -82,7 +82,7 @@ pub(super) fn eval_wpm(input: TokenStream, path: Path) -> Option<TokenStream> {
             // function returned a value. Otherwise it's `None`.
             if let Some(Value::I32(ptr)) = ret {
                 let ts_ptr: *mut TokenStream = unsafe { ptr as *mut TokenStream };
-                let ts: &mut TokenStream = unsafe { &mut *ts_ptr };
+                let ts: &TokenStream = unsafe { &mut *ts_ptr };
 
                 ts
             } else {

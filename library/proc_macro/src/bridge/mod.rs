@@ -162,6 +162,8 @@ mod closure;
 mod fxhash;
 #[forbid(unsafe_code)]
 mod handle;
+#[allow(unsafe_code)]
+mod wpm_buffer;
 #[macro_use]
 #[forbid(unsafe_code)]
 mod rpc;

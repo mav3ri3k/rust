@@ -293,6 +293,78 @@ pub struct Client<I, O> {
     pub(super) _marker: PhantomData<fn(I) -> O>,
 }
 
+// Maintains client in wasm runtime
+pub struct WpmClient<I, O> {
+    // FIXME(eddyb) use a reference to the `static COUNTERS`, instead of
+    // a wrapper `fn` pointer, once `const fn` can reference `static`s.
+    pub(super) get_handle_counters: extern "C" fn() -> &'static HandleCounters,
+
+    pub(super) run: extern "C" fn(BridgeConfig<'_>) -> Buffer,
+
+    pub(super) _marker: PhantomData<fn(I) -> O>,
+}
+
+impl WpmClient<crate::TokenStream, crate::TokenStream> {
+    //TODO(mav3ri3k)
+    //How to send path with the generic function ??
+    pub const fn expand(_path: &str) -> Self {
+        Client {
+            get_handle_counters: HandleCounters::get,
+            run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
+                run_client(bridge, |input| eval_wpm(crate::TokenStream(Some(input))).0)
+            }),
+            _marker: PhantomData,
+        }
+    }
+}
+
+fn run_wpm_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
+    config: BridgeConfig<'_>,
+    f: impl FnOnce(A) -> R,
+) -> Buffer {
+    let BridgeConfig { input: mut buf, dispatch, force_show_panics, .. } = config;
+
+    panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        maybe_install_panic_hook(force_show_panics);
+
+        // Make sure the symbol store is empty before decoding inputs.
+        Symbol::invalidate_all();
+
+        let reader = &mut &buf[..];
+        let (globals, input) = <(ExpnGlobals<Span>, A)>::decode(reader, &mut ());
+
+        // Put the buffer we used for input back in the `Bridge` for requests.
+        let state = RefCell::new(Bridge { cached_buffer: buf.take(), dispatch, globals });
+
+        let output = state::set(&state, || f(input));
+
+        // Take the `cached_buffer` back out, for the output value.
+        buf = RefCell::into_inner(state).cached_buffer;
+
+        // HACK(eddyb) Separate encoding a success value (`Ok(output)`)
+        // from encoding a panic (`Err(e: PanicMessage)`) to avoid
+        // having handles outside the `bridge.enter(|| ...)` scope, and
+        // to catch panics that could happen while encoding the success.
+        //
+        // Note that panics should be impossible beyond this point, but
+        // this is defensively trying to avoid any accidental panicking
+        // reaching the `extern "C"` (which should `abort` but might not
+        // at the moment, so this is also potentially preventing UB).
+        buf.clear();
+        Ok::<_, ()>(output).encode(&mut buf, &mut ());
+    }))
+    .map_err(PanicMessage::from)
+    .unwrap_or_else(|e| {
+        buf.clear();
+        Err::<(), _>(e).encode(&mut buf, &mut ());
+    });
+
+    // Now that a response has been serialized, invalidate all symbols
+    // registered with the interner.
+    Symbol::invalidate_all();
+    buf
+}
+
 impl<I, O> Copy for Client<I, O> {}
 impl<I, O> Clone for Client<I, O> {
     fn clone(&self) -> Self {
@@ -391,6 +463,7 @@ impl Client<crate::TokenStream, crate::TokenStream> {
     pub const fn expand1(f: impl Fn(crate::TokenStream) -> crate::TokenStream + Copy) -> Self {
         Client {
             get_handle_counters: HandleCounters::get,
+            // Solve to: `extern "C" run: fn(BridgeConfig<'_>) -> Buffer`
             run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
                 run_client(bridge, |input| f(crate::TokenStream(Some(input))).0)
             }),
@@ -404,7 +477,7 @@ impl Client<crate::TokenStream, crate::TokenStream> {
         Client {
             get_handle_counters: HandleCounters::get,
             run: super::selfless_reify::reify_to_extern_c_fn_hrt_bridge(move |bridge| {
-                run_client(bridge, |input| eval_wpm(crate::TokenStream(Some(input))).0)
+                run_wpm_client(bridge, |input| eval_wpm(crate::TokenStream(Some(input))).0)
             }),
             _marker: PhantomData,
         }

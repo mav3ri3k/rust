@@ -3288,7 +3288,9 @@ version = "0.0.0"
 dependencies = [
  "core",
  "std",
- "wain",
+ "wain-exec",
+ "wain-syntax-binary",
+ "wain-validate",
 ]
 
 [[package]]
@@ -6343,26 +6345,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
-name = "wain"
-version = "0.1.7"
+name = "wain-ast"
+version = "0.2.2"
 dependencies = [
  "core",
  "std",
- "wain-ast",
- "wain-exec",
- "wain-syntax-binary",
- "wain-syntax-text",
- "wain-validate",
 ]
-
-[[package]]
-name = "wain-ast"
-version = "0.2.2"
 
 [[package]]
 name = "wain-exec"
 version = "0.3.1"
 dependencies = [
+ "core",
+ "std",
  "wain-ast",
 ]
 
@@ -6370,13 +6365,8 @@ dependencies = [
 name = "wain-syntax-binary"
 version = "0.1.5"
 dependencies = [
- "wain-ast",
-]
-
-[[package]]
-name = "wain-syntax-text"
-version = "0.2.1"
-dependencies = [
+ "core",
+ "std",
  "wain-ast",
 ]
 
@@ -6384,6 +6374,8 @@ dependencies = [
 name = "wain-validate"
 version = "0.1.5"
 dependencies = [
+ "core",
+ "std",
  "wain-ast",
 ]
 
