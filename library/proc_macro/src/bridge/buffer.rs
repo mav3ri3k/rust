@@ -7,7 +7,7 @@ use std::slice;
 
 #[repr(C)]
 pub struct Buffer {
-    data: *mut u8,
+    pub data: *mut u8,
     len: usize,
     capacity: usize,
     reserve: extern "C" fn(Buffer, usize) -> Buffer,

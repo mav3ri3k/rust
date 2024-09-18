@@ -151,7 +151,7 @@ macro_rules! reverse_decode {
 #[allow(unsafe_code)]
 mod arena;
 #[allow(unsafe_code)]
-mod buffer;
+pub mod buffer;
 #[allow(unsafe_code)]
 pub mod client;
 #[allow(unsafe_code)]

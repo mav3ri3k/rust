@@ -4,9 +4,9 @@
 use anyhow::Context;
 use anyhow::Result;
 use proc_macro::bridge::client::ProcMacro;
+use proc_macro::bridge::buffer::Buffer;
 use proc_macro::bridge::client::WasmProcMacroRef;
 use proc_macro::bridge::WasmRuntimeRef;
-use proc_macro::TokenStream;
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -125,21 +125,49 @@ pub unsafe extern "C" fn load_wasm_proc_macro(
 // to do is serialise these to send to wasm. This is possibly wasteful, since they were already
 // serialised and deserialized in order to get them this far. We could accept and return Buffers
 // instead. That would require making Buffer public, which is why I didn't do it yet.
-pub fn run_proc_macro(macro_ref: WasmProcMacroRef, _item: TokenStream) -> TokenStream {
+pub fn run_proc_macro(macro_ref: WasmProcMacroRef, buf: Buffer) -> Buffer {
     let runtime = unsafe { &*(macro_ref.runtime().handle() as *const SharedRuntime) };
     let mut runtime = runtime.inner.lock().unwrap();
     let runtime = &mut *runtime;
     let m = &runtime.macros[macro_ref.macro_id() as usize];
     let file = &mut runtime.wasm_files[m.file_index];
-    match m.macro_fn.call(&mut file.store, ()) {
-        Ok(answer) => format!("fn answer() -> u32 {{ {answer} }}")
-            .parse()
-            .unwrap(),
-        Err(err) => {
-            eprintln!("Error: {err}");
-            TokenStream::default()
-        }
+    let memory = file
+        .instance
+        .get_memory(&mut file.store, "memory")
+        .expect("Failed to get WASM memory");
+
+
+    let alloc = file.instance.get_typed_func::<u32, u32>(&mut file.store, "allocate").expect("Error getting alloc function from module");
+
+    // copy data to wasm
+    let ptr = alloc.call(&mut file.store, buf.len().try_into().unwrap()).expect("Error while calling alloc") as usize;
+    let data = &mut memory.data_mut(&mut file.store)[ptr..(ptr + buf.len())];
+    data.copy_from_slice(&buf[..]);
+
+    // run macro
+    let run_client = file.instance.get_typed_func::<u32, (u32, u32)>(&mut file.store, "run_macro").expect("Error getting run function from module");
+    let res = run_client.call(&mut file.store, (ptr.try_into().unwrap(), buf.len())).expect("Error while calling run function");
+
+    // get buffer
+    let buf_len = res.0 as usize;
+    let res_ptr = res.1 as usize;
+    let mut data = memory.data(&file.store)[res_ptr..(res_ptr + buf_len)].to_vec();
+
+    let mut index = -1;
+    let mut pos = 0;
+
+    for x in &data {
+      if *x == b'!' {
+        index = pos;
+        break;
+      }
+      pos += 1;
     }
+    if index >= 0 {
+      data.truncate(index as usize);
+    }
+
+    Buffer::from(data)
 }
 
 impl Runtime {
