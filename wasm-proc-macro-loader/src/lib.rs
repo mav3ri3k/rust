@@ -145,15 +145,15 @@ pub fn run_proc_macro(macro_ref: WasmProcMacroRef, buf: Buffer) -> Buffer {
     data.copy_from_slice(&buf[..]);
 
     // run macro
-    let run_client = file.instance.get_typed_func::<u32, (u32, u32)>(&mut file.store, "run_macro").expect("Error getting run function from module");
-    let res = run_client.call(&mut file.store, (ptr.try_into().unwrap(), buf.len())).expect("Error while calling run function");
+    let run_client = file.instance.get_typed_func::<(u32, u32), (u32, u32)>(&mut file.store, "run_macro").expect("Error getting run function from module");
+    let res = run_client.call(&mut file.store, (ptr.try_into().unwrap(), buf.len().try_into().unwrap())).expect("Error while calling run function");
 
     // get buffer
     let buf_len = res.0 as usize;
     let res_ptr = res.1 as usize;
     let mut data = memory.data(&file.store)[res_ptr..(res_ptr + buf_len)].to_vec();
 
-    let mut index = -1;
+    let mut index = 0;
     let mut pos = 0;
 
     for x in &data {

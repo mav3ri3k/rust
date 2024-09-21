@@ -395,6 +395,35 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
     buf
 }
 
+pub fn run_client_buffer(
+    mut buf: Buffer,
+    f: impl Fn(crate::TokenStream) -> crate::TokenStream,
+) -> Buffer {
+    Symbol::invalidate_all();
+    let reader = &mut &buf[..];
+    let (_globals, input) =
+        <(ExpnGlobals<Span>, crate::bridge::client::TokenStream)>::decode(reader, &mut ());
+
+    // Put the buffer we used for input back in the `Bridge` for requests.
+    //let state = RefCell::new(Bridge { cached_buffer: buf.take(), dispatch, globals });
+
+    let output = f(crate::TokenStream(Some(input))).0;
+
+    // Take the `cached_buffer` back out, for the output value.
+    //buf = RefCell::into_inner(state).cached_buffer;
+
+    // to catch panics that could happen while encoding the success.
+    //
+    // Note that panics should be impossible beyond this point, but
+    // this is defensively trying to avoid any accidental panicking
+    // reaching the `extern "C"` (which should `abort` but might not
+    // at the moment, so this is also potentially preventing UB).
+    buf.clear();
+    Ok::<_, ()>(output).encode(&mut buf, &mut ());
+    Symbol::invalidate_all();
+    buf
+}
+
 fn run_wasm_client(
     config: BridgeConfig<'_>,
     wasm_macro_ref: WasmProcMacroRef,

@@ -3,11 +3,11 @@
 set -e
 (
     cd ../wasm-proc-macro
-    cargo build --release
+    cargo +stage1 build --release
 )
 (
     cd ../pmacro1
-    cargo build
+    cargo +stage1 build
 )
 
 # We need this file for the metadata. It needs to contain a macro with the same name as our wasm proc-macro.
