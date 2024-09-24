@@ -14,9 +14,12 @@ set -e
 cp ../pmacro1/target/debug/libpmacro1.so .
 
 # This contains the actual wasm code that will be run.
-cp ../wasm-proc-macro/target/wasm32-wasip1/release/wasm_proc_macro.wasm libpmacro1.wpm
+cp ../wasm-proc-macro/target/wasm32-unknown-unknown/release/wasm_proc_macro.wasm libpmacro1.wpm
+ls
 
-RUSTC_WASM_PROC_MACRO_LOADER=$PWD/../wasm-proc-macro-loader/target/debug/libwasm_proc_macro_loader.so
+export RUSTC_WASM_PROC_MACRO_LOADER=$PWD/../wasm-proc-macro-loader/target/debug/libwasm_proc_macro_loader.so
+echo "Value: "
+echo $RUSTC_WASM_PROC_MACRO_LOADER
 if [ ! -f "$RUSTC_WASM_PROC_MACRO_LOADER" ]; then
     echo "Please run cargo build in wasm-proc-macro-loader first" >&2
     exit 1

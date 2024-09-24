@@ -34,11 +34,11 @@ struct WasmFile {
 struct Macro {
     /// The index into `wasm_files` on `Runtime`.
     file_index: usize,
-    macro_fn: TypedFunc<(), u32>,
 }
 
 impl WasmFile {
     fn new(runtime: &Runtime, path: &Path) -> Result<Self> {
+      println!("New WasmFile created");
         let mut linker = wasmtime::Linker::new(&runtime.engine);
         wasi_common::sync::add_to_linker(&mut linker, |s| s)?;
 
@@ -56,7 +56,6 @@ impl WasmFile {
             .call(&mut store, ())?;
 
         let instance = linker.instantiate(&mut store, &module)?;
-
         Ok(Self { instance, store })
     }
 
@@ -65,6 +64,7 @@ impl WasmFile {
     // information about _all_ of the macros defined in the file. That data would contain the macro
     // names, types and addresses of the functions that do the work of the macro.
     fn get_macro_name(&mut self) -> Result<String> {
+      println!("fn get_macro_name");
         let macro_name_len_fn = self
             .instance
             .get_typed_func::<(), u32>(&mut self.store, "macro_name_len")
@@ -87,16 +87,19 @@ impl WasmFile {
     }
 
     fn get_macro_fn(&mut self, name: &str) -> Result<TypedFunc<(), u32>> {
+      println!("fn get_macro_fn");
         self.instance.get_typed_func(&mut self.store, name)
     }
 }
 
 #[no_mangle]
 pub extern "C" fn create_runtime() -> WasmRuntimeRef {
+  println!("fn create_runtime");
     let runtime = Box::new(SharedRuntime {
         inner: Mutex::new(Runtime::default()),
     });
     let runtime = Box::leak(runtime);
+
     unsafe { WasmRuntimeRef::new(runtime as *const SharedRuntime as usize) }
 }
 
@@ -109,6 +112,7 @@ pub unsafe extern "C" fn load_wasm_proc_macro(
     path_ptr: *const u8,
     path_len: usize,
 ) -> *const &'static [ProcMacro] {
+  println!("fn load_wasm_proc_macro");
     let runtime = unsafe { &*(runtime_ref.handle() as *const SharedRuntime) };
     let path_slice = unsafe { std::slice::from_raw_parts(path_ptr, path_len) };
     let path = Path::new(OsStr::from_bytes(path_slice));
@@ -126,31 +130,47 @@ pub unsafe extern "C" fn load_wasm_proc_macro(
 // serialised and deserialized in order to get them this far. We could accept and return Buffers
 // instead. That would require making Buffer public, which is why I didn't do it yet.
 pub fn run_proc_macro(macro_ref: WasmProcMacroRef, buf: Buffer) -> Buffer {
+  println!("In main run_proc_macro fn");
     let runtime = unsafe { &*(macro_ref.runtime().handle() as *const SharedRuntime) };
     let mut runtime = runtime.inner.lock().unwrap();
     let runtime = &mut *runtime;
+    println!("Obtained runtime");
     let m = &runtime.macros[macro_ref.macro_id() as usize];
+    println!("Obtained runtime macros");
     let file = &mut runtime.wasm_files[m.file_index];
+    println!("Obtained macro file");
     let memory = file
         .instance
         .get_memory(&mut file.store, "memory")
         .expect("Failed to get WASM memory");
 
+    println!("Obtained memory instance");
 
+    println!("Loading alloc fn");
     let alloc = file.instance.get_typed_func::<u32, u32>(&mut file.store, "allocate").expect("Error getting alloc function from module");
 
+    println!("Loading alloc fn finished");
     // copy data to wasm
     let ptr = alloc.call(&mut file.store, buf.len().try_into().unwrap()).expect("Error while calling alloc") as usize;
+    println!("Ptr obtained from alloc");
     let data = &mut memory.data_mut(&mut file.store)[ptr..(ptr + buf.len())];
+    println!("Slice of data obtained from ptr");
     data.copy_from_slice(&buf[..]);
+    println!("Data updated");
+
+    let dalloc = file.instance.get_typed_func::<(u32, u32), ()>(&mut file.store, "deallocate").expect("Error getting dalloc function from module");
+    println!("Got unused dalloc fn");
+    let new_macro = file.instance.get_typed_func::<(u32, u32), u32>(&mut file.store, "new_macro").expect("Error getting new_macro function from module");
+    let res_new_macro = new_macro.call(&mut file.store, (12, 2)).expect("Error while calling new_macro function");
+    println!("Got new macro result: {res_new_macro}");
 
     // run macro
-    let run_client = file.instance.get_typed_func::<(u32, u32), (u32, u32)>(&mut file.store, "run_macro").expect("Error getting run function from module");
+    let run_client = file.instance.get_typed_func::<(u32, u32), u32>(&mut file.store, "run_macro").expect("Error getting main run function function from module");
     let res = run_client.call(&mut file.store, (ptr.try_into().unwrap(), buf.len().try_into().unwrap())).expect("Error while calling run function");
 
     // get buffer
-    let buf_len = res.0 as usize;
-    let res_ptr = res.1 as usize;
+    let buf_len = res as usize;
+    let res_ptr = ptr as usize;
     let mut data = memory.data(&file.store)[res_ptr..(res_ptr + buf_len)].to_vec();
 
     let mut index = 0;
@@ -176,6 +196,7 @@ impl Runtime {
         path: &Path,
         runtime_ref: WasmRuntimeRef,
     ) -> Result<&'static [ProcMacro]> {
+      println!("fn load_wasm");
         let mut file = WasmFile::new(self, path)?;
         let file_index = self.wasm_files.len();
 
@@ -187,15 +208,15 @@ impl Runtime {
         let macro_id = self.macros.len() as u32;
         let macro_ref = unsafe { WasmProcMacroRef::new(runtime_ref, macro_id) };
         let macros = vec![ProcMacro::wasm_bang(name, macro_ref, run_proc_macro)];
-
-        let macro_fn = file.get_macro_fn(name)?;
+        println!("About to get fn get_macro_fn");
+          println!("Name: {name}");
+        //let macro_fn = file.get_macro_fn(name)?;
 
         println!("Loaded wasm proc macro named `{name}`");
 
         self.wasm_files.push(file);
         self.macros.push(Macro {
             file_index,
-            macro_fn,
         });
 
         Ok(macros.leak())

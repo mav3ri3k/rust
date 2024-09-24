@@ -758,6 +758,7 @@ impl<'a> CrateLocator<'a> {
                 } else if loc.file_name().unwrap().to_str().unwrap().ends_with(".rmeta") {
                     rmetas.insert(loc_canon, PathKind::ExternFlag);
                 } else if loc.file_name().unwrap().to_str().unwrap().ends_with(".wpm") {
+                    println!("File name: {}", loc.file_name().unwrap().to_str().unwrap());
                     wasm_proc_macros.insert(loc_canon, PathKind::ExternFlag);
                 } else {
                     dylibs.insert(loc_canon, PathKind::ExternFlag);
@@ -801,10 +802,13 @@ fn get_metadata_section<'p>(
         }
         CrateFlavor::Dylib | CrateFlavor::WasmProcMacro => {
             let buf = if matches!(flavor, CrateFlavor::WasmProcMacro) {
+                println!("Found wasm proc macro");
                 // For now, we assume that there's a .so version of the proc-macro alongside the
                 // .wpm. We load the metadata from that. Eventually, we should either store the
                 // metadata in the wasm file, or in a separate .rmeta file that lives alongside it.
-                loader.get_dylib_metadata(target, &filename.with_extension("so")).map_err(MetadataError::LoadFailure)?
+                loader
+                    .get_dylib_metadata(target, &filename.with_extension("so"))
+                    .map_err(MetadataError::LoadFailure)?
             } else {
                 loader.get_dylib_metadata(target, filename).map_err(MetadataError::LoadFailure)?
             };

@@ -98,13 +98,18 @@ struct WasmProcMacroLoader {
 }
 
 impl WasmProcMacroLoader {
-    fn new(tcx: TyCtxt<'_>) -> Result<Self, CrateError> {
+    fn new(_tcx: TyCtxt<'_>) -> Result<Self, CrateError> {
         // TODO: Won't be .so on other platforms.
         let wasm_loader_path = if let Ok(loader) = std::env::var("RUSTC_WASM_PROC_MACRO_LOADER") {
+            println!("Value: {:#?}", loader);
             PathBuf::from(loader)
         } else {
-            tcx.sess.sysroot.join("libwasm-proc-macro-loader.so")
+            PathBuf::from(
+                "/home/gh-mav3ri3k/rust/use-wasm-proc-macro/../wasm-proc-macro-loader/target/debug/libwasm_proc_macro_loader.so",
+            )
         };
+
+        println!("Wasm loader path: {}", wasm_loader_path.display());
 
         let lib = DynamicLibrary::open(&wasm_loader_path)?;
 
@@ -116,6 +121,7 @@ impl WasmProcMacroLoader {
 
     fn load_wasm(&mut self, path: &Path) -> Result<&'static [ProcMacro], CrateError> {
         // TODO: Come up with mechanism for getting errors back from the loader.
+        println!("In load_wasm, path: {}", path.display());
         let path_bytes = path.as_os_str().as_encoded_bytes();
         let proc_macros = (self.loader_fn)(self.runtime, path_bytes.as_ptr(), path_bytes.len());
         Ok(unsafe { *proc_macros })

@@ -395,6 +395,7 @@ fn run_client<A: for<'a, 's> DecodeMut<'a, 's, ()>, R: Encode<()>>(
     buf
 }
 
+// mean to be only run on wasm client
 pub fn run_client_buffer(
     mut buf: Buffer,
     f: impl Fn(crate::TokenStream) -> crate::TokenStream,
