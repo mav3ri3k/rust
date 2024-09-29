@@ -3,6 +3,10 @@
 set -e
 (
     cd ../wasm-proc-macro
+    cargo +stage1 build --target wasm32-unknown-unknown --release
+)
+(
+    cd ../wasm-proc-macro-loader
     cargo +stage1 build --release
 )
 (
@@ -18,6 +22,7 @@ cp ../wasm-proc-macro/target/wasm32-unknown-unknown/release/wasm_proc_macro.wasm
 ls
 
 export RUSTC_WASM_PROC_MACRO_LOADER=$PWD/../wasm-proc-macro-loader/target/debug/libwasm_proc_macro_loader.so
+export RUSTC_WASM_PROC_MACRO_AVAIL=1
 echo "Value: "
 echo $RUSTC_WASM_PROC_MACRO_LOADER
 if [ ! -f "$RUSTC_WASM_PROC_MACRO_LOADER" ]; then
