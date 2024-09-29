@@ -1,3 +1,12 @@
+## GSOC 24 Project Archieve
+This is snapshot of code during its final state at the end of gsoc project: [Sandboxed and Deterministic Proc Macro using Wasm](https://summerofcode.withgoogle.com/programs/2024/projects/kXG0mZoj) completion.
+This branch: gsoc24, shall always remain as archieve of the work done.
+- For final notes read: [`gsoc24.md`](https://github.com/mav3ri3k/rust/blob/gsoc24/gsoc24.md)
+- For running the code read: [`wasm-proc-macro-draft.md`](https://github.com/mav3ri3k/rust/blob/gsoc24/wasm-proc-macros-draft.md)
+
+To see diff of the changes please checkout [github branch diff](https://github.com/rust-lang/rust/compare/master...mav3ri3k:rust:gsoc24)
+
+---
 <div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/rust-lang/www.rust-lang.org/master/static/images/rust-social-wide-dark.svg">
