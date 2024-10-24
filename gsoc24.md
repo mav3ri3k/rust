@@ -7,7 +7,8 @@ Add experimental support to Rustc for building and running procedural macros as 
 The project was inspired by: [Build-time execution sandboxing](https://github.com/rust-lang/compiler-team/issues/475) and [Pre-RFC: Sandboxed, deterministic, reproducible, efficient Wasm compilation of proc macros](https://internals.rust-lang.org/t/pre-rfc-sandboxed-deterministic-reproducible-efficient-wasm-compilation-of-proc-macros/19359)
 
 I started with the project in a top down fashion such that I started with the problem and slowly chipping away at it as required.
-**Fire first aim later**.
+**Fire first aim later**. My adventures were guided by [Mr. David Lattimore](https://github.com/davidlattimore) who has been incredibly generous
+with his time and teachings. Thank You 🙏 .
 
 Few notable decisions were taken early on based on discussions and advice from other community members so as to only focus on
 `wasm32-unknown-unknown` is the wasm target, and the focus is on using Wasmtime as the runtime.
